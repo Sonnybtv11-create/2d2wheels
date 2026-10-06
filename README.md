@@ -2,7 +2,7 @@
 
 A 2D wheelie game in the browser. Pick one of five real electric dirt bikes, get the front wheel up, and ride as far as you can on the back wheel without looping out or setting the front down.
 
-There's no build step and nothing to install. Open `index.html` in a browser, or serve the folder (`npm start` runs `python3 -m http.server 8080`). It works on desktop and on phones (on-screen buttons appear on touch devices).
+There's no build step and nothing to install. The display fonts load from Google Fonts; offline, the page falls back to system fonts. Open `index.html` in a browser, or serve the folder (`npm start` runs `python3 -m http.server 8080`). It works on desktop and on phones (on-screen buttons appear on touch devices).
 
 ## How to play
 
@@ -31,7 +31,15 @@ I picked these from what the e-moto press and dealers describe as the best selle
 | E Ride Pro-SS 3.0 | 16 kW | 63 kg | 97 km/h | Hard |
 | Stark Varg MX | 60 kW (80 hp) | 118 kg | 142 km/h | Expert |
 
-Specs come from manufacturer and retailer listings, and each bike's sources are in `js/bikes.js` and linked in the game menu. Published figures vary between model years and markets (for example, restricted vs unrestricted top speeds), so treat them as representative. Wheelbase, wheel size and colours are only used for drawing and are approximate. This is a fan game and isn't affiliated with any of these brands.
+Specs come from manufacturer and retailer listings, and each bike's sources are in `js/bikes.js` and linked in the game menu. Published figures vary between model years and markets (for example, restricted vs unrestricted top speeds), so treat them as representative. Wheelbases are approximate. This is a fan game and isn't affiliated with any of these brands.
+
+## Art
+
+The bikes are vector drawings traced from side-on product photos, one per model, in the colourway shown in the menu: a red Stark Varg MX, a silver Segway X260, a green Sur-Ron Light Bee X, a blue Talaria Sting R MX4 and a black E Ride Pro-SS. `js/bikeart.js` stores each trace in the photo's own pixel coordinates along with a calibration (both axle centres, the real wheelbase and the tyre radius), and converts it to metres when the page loads. That way wheel size, seat height and peg position all keep their real proportions. The source photo for each bike is listed at the top of that file.
+
+The rider is drawn in motocross gear (helmet with peak and goggles, neck brace, jersey, knee braces, boots). Knees and elbows are placed with two-bone IK, so the same rider fits every bike's seat, pegs and bars, and leaning moves the hips and torso. Each bike has a matching rider kit.
+
+The track is a desert motocross course at dusk: layered mesas, Joshua trees, course tape, distance boards, dust from the rear tyre, and a shadow under the bike.
 
 ## How the physics works
 
@@ -49,9 +57,10 @@ index.html        page, HUD and menus
 css/style.css
 js/bikes.js       bike roster, specs and sources
 js/physics.js     wheelie simulation and terrain (no DOM)
-js/render.js      canvas drawing: world, bikes, rider, gauge
+js/bikeart.js     traced bike art, wheels, rider and kits (no DOM)
+js/render.js      canvas drawing: sky, track, dust, gauge
 js/game.js        game loop, input, audio, menus, saved bests
-tests/            node:test suite for the physics
+tests/            node:test suites for the physics and the art data
 ```
 
-Run the tests with `npm test` (Node 18+). They check that every bike can lift, that pinning the throttle loops out but leaves time to react, that more power makes the bike harder to hold, that a keyboard-style bot can hold a 150 m+ wheelie on every bike, and that the result doesn't depend on frame rate.
+Run the tests with `npm test` (Node 18+). They check that the art's calibration matches the physics (wheelbase and wheel size), that every bike can lift, that pinning the throttle loops out but leaves time to react, that more power makes the bike harder to hold, that a keyboard-style bot can hold a 150 m+ wheelie on every bike, and that the result doesn't depend on frame rate.

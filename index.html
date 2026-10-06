@@ -5,74 +5,107 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
   <title>2D2Wheels</title>
   <meta name="description" content="A 2D wheelie game with five real electric dirt bikes.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Saira+Condensed:wght@500;600;700;800&family=Saira:wght@400;500;600&display=swap">
   <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
   <canvas id="game"></canvas>
 
   <div id="hud" hidden>
-    <div class="hud-left">
+    <div class="hud-dist">
       <div class="hud-label">Wheelie</div>
-      <div id="hud-dist" class="hud-big">0.0 m</div>
-      <div id="hud-best" class="hud-small">Best 0.0 m</div>
+      <div class="hud-big"><span id="hud-dist">0.0</span><small>m</small></div>
+      <div class="best-track" aria-hidden="true"><i id="hud-bestfill"></i></div>
+      <div id="hud-best" class="hud-sub">Best 0.0 m</div>
     </div>
-    <div class="hud-right">
-      <div id="hud-bike" class="hud-small"></div>
-      <div id="hud-speed" class="hud-big">0 km/h</div>
-      <div id="hud-mph" class="hud-small">0 mph</div>
+    <div class="hud-speed">
+      <div class="hud-big"><span id="hud-speed">0</span><small>km/h</small></div>
+      <div id="hud-mph" class="hud-sub">0 mph</div>
+      <div id="hud-bike" class="hud-sub hud-bike"></div>
     </div>
     <div id="hud-hint" class="hud-hint"></div>
     <div class="hud-buttons">
-      <button id="btn-sound" class="icon-btn" aria-label="Toggle sound" title="Sound (M)">🔊</button>
-      <button id="btn-menu" class="icon-btn" aria-label="Back to bike select" title="Menu (Esc)">☰</button>
+      <button id="btn-sound" class="icon-btn" type="button" aria-label="Toggle sound" title="Sound (M)">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path id="snd-on" d="M4 9h4l5-4v14l-5-4H4zM16 8.5a5 5 0 0 1 0 7M18.5 6a8.5 8.5 0 0 1 0 12"/><path id="snd-off" d="M4 9h4l5-4v14l-5-4H4zM17 9l5 6M22 9l-5 6" style="display:none"/></svg>
+      </button>
+      <button id="btn-menu" class="icon-btn" type="button" aria-label="Back to bike select" title="Garage (Esc)">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+      </button>
     </div>
   </div>
 
   <div id="touch" hidden>
     <div class="touch-group">
-      <button class="touch-btn" data-key="brake">BRAKE</button>
-      <button class="touch-btn" data-key="leanBack">◀ LEAN</button>
+      <button class="touch-btn" type="button" data-key="brake"><span>Brake</span></button>
+      <button class="touch-btn" type="button" data-key="leanBack"><span>◀ Lean</span></button>
     </div>
     <div class="touch-group">
-      <button class="touch-btn" data-key="leanFwd">LEAN ▶</button>
-      <button class="touch-btn throttle" data-key="throttle">GAS</button>
+      <button class="touch-btn" type="button" data-key="leanFwd"><span>Lean ▶</span></button>
+      <button class="touch-btn throttle" type="button" data-key="throttle"><span>Gas</span></button>
     </div>
   </div>
 
   <section id="menu" class="overlay">
-    <div class="panel">
-      <h1>2D2Wheels</h1>
-      <p class="tag">Pick a bike, get the front wheel up, and see how far you can ride on the back wheel.</p>
-      <div id="bike-list" class="bike-list"></div>
-      <div id="bike-detail"></div>
-      <div class="menu-actions">
-        <button id="btn-start" class="primary">Ride <span class="kbd">Enter</span></button>
+    <div class="garage">
+      <header class="brand">
+        <div class="logo" aria-label="2D2Wheels"><span class="logo-a">2D2</span><span class="logo-b">Wheels</span></div>
+        <p class="tag">Pick a bike, get the front up, and ride as far as you can on the back wheel.</p>
+      </header>
+
+      <div class="stage-wrap">
+        <canvas id="stage" aria-hidden="true"></canvas>
+        <button id="prev" class="nav prev" type="button" aria-label="Previous bike">‹</button>
+        <button id="next" class="nav next" type="button" aria-label="Next bike">›</button>
       </div>
-      <div class="controls">
-        <div><span class="kbd">↑</span>/<span class="kbd">W</span>/<span class="kbd">Space</span> throttle</div>
-        <div><span class="kbd">↓</span>/<span class="kbd">S</span> rear brake (drops the front)</div>
-        <div><span class="kbd">←</span>/<span class="kbd">A</span> lean back · <span class="kbd">→</span>/<span class="kbd">D</span> lean forward</div>
-        <div>Keep the needle in the green zone. If it goes past the balance point you loop out.</div>
+
+      <div class="info">
+        <div class="meta">
+          <span id="bike-num" class="plate-num">1</span>
+          <span id="bike-diff" class="diff">Easy</span>
+          <span id="bike-maker" class="maker"></span>
+        </div>
+        <h2 id="bike-name"></h2>
+        <p id="bike-blurb" class="blurb"></p>
+        <div id="specs" class="specs"></div>
+        <div class="best-row"><span>Your best</span><b id="bike-best">No wheelie yet</b></div>
+        <button id="btn-start" class="ride" type="button">Ride <span class="kbd">Enter</span></button>
+        <p id="bike-sources" class="sources"></p>
       </div>
-      <p class="fine">Specs are from manufacturer and retailer listings, and the riding physics are simplified. This is a fan game and isn't affiliated with any of these brands.</p>
+
+      <nav id="bike-list" class="picker" aria-label="Bikes"></nav>
+
+      <footer class="controls">
+        <span><span class="kbd">↑</span><span class="kbd">W</span> Throttle</span>
+        <span><span class="kbd">↓</span><span class="kbd">S</span> Rear brake</span>
+        <span><span class="kbd">←</span><span class="kbd">A</span> Lean back</span>
+        <span><span class="kbd">→</span><span class="kbd">D</span> Lean forward</span>
+        <span class="fine">Specs from manufacturer and retailer listings; physics simplified. A fan game, not affiliated with these brands.</span>
+      </footer>
     </div>
   </section>
 
   <section id="results" class="overlay" hidden>
-    <div class="panel small">
-      <h2 id="res-title">Front wheel down</h2>
-      <div id="res-dist" class="res-dist">0.0 m</div>
-      <div id="res-detail" class="res-detail"></div>
+    <div class="slip">
+      <div class="slip-head"><span id="res-title">Front wheel down</span><span id="res-bike"></span></div>
+      <div class="res-dist"><span id="res-dist">0.0</span><small>m</small></div>
       <div id="res-best" class="res-best"></div>
-      <div class="menu-actions">
-        <button id="btn-retry" class="primary">Again <span class="kbd">R</span></button>
-        <button id="btn-change">Change bike <span class="kbd">Esc</span></button>
+      <dl class="res-stats">
+        <div><dt>On the back wheel</dt><dd id="res-time">0.0 s</dd></div>
+        <div><dt>Top speed</dt><dd id="res-speed">0 km/h</dd></div>
+        <div><dt>Highest pitch</dt><dd id="res-angle">0°</dd></div>
+      </dl>
+      <div class="slip-actions">
+        <button id="btn-retry" class="ride" type="button">Again <span class="kbd">R</span></button>
+        <button id="btn-change" class="ghost" type="button">Garage <span class="kbd">Esc</span></button>
       </div>
     </div>
   </section>
 
   <script src="js/bikes.js"></script>
   <script src="js/physics.js"></script>
+  <script src="js/bikeart.js"></script>
   <script src="js/render.js"></script>
   <script src="js/game.js"></script>
 </body>
