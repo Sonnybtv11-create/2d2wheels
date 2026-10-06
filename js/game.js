@@ -29,6 +29,7 @@
   let rider = null; // crash tumble
   let particles = [];
   let stats = { topSpeed: 0, maxPitch: 0 };
+  let milestone = 0, passedBest = false, zoom = 1;
   let hintTimer = 0;
   let shake = 0;
   const keys = { throttle: false, brake: false, leanBack: false, leanFwd: false };
@@ -191,6 +192,7 @@
     rider = null;
     particles = [];
     stats = { topSpeed: 0, maxPitch: 0 };
+    milestone = 0; passedBest = false;
     camY = terrain.height(0);
     camFocus = 0;
   }
@@ -214,7 +216,7 @@
     const prev = best(bike.id);
     const isBest = sim.score > prev;
     if (isBest) store.set('best.' + bike.id, sim.score);
-    $('res-title').textContent = crashed ? 'Looped out' : 'Front wheel down';
+    $('res-title').textContent = crashed ? 'Looped out' : sim.stalled ? 'Ran out of speed' : 'Front wheel down';
     $('res-title').className = crashed ? 'crash' : '';
     $('res-bike').textContent = bike.name;
     $('res-dist').textContent = sim.score.toFixed(1);
@@ -226,6 +228,15 @@
     rb.className = 'res-best' + (isBest ? ' new' : '');
     show('results', true); show('touch', false);
     $('btn-retry').focus({ preventScroll: true });
+  }
+
+  function toast(text, big) {
+    const el = $('hud-toast');
+    el.textContent = text;
+    el.classList.toggle('big', !!big);
+    el.classList.remove('show');
+    void el.offsetWidth; // restart the animation
+    el.classList.add('show');
   }
 
   function hint(text, seconds, warn) {
@@ -324,6 +335,20 @@
         osc2.frequency.setTargetAtTime(180 + vr * 1400, t, 0.05);
         gain.gain.setTargetAtTime(active ? 0.015 + 0.05 * s.throttle : 0, t, 0.05);
         noiseGain.gain.setTargetAtTime(active ? Math.min(0.06, vr * 0.08) : 0, t, 0.1);
+      },
+      // short two-note chime for milestones
+      chime(high) {
+        if (!ac || muted) return;
+        const t = ac.currentTime;
+        [high ? 988 : 784, high ? 1319 : 1047].forEach((f, i) => {
+          const o = ac.createOscillator(), g = ac.createGain();
+          o.type = 'triangle'; o.frequency.value = f;
+          g.gain.setValueAtTime(0, t + i * 0.09);
+          g.gain.linearRampToValueAtTime(0.07, t + i * 0.09 + 0.01);
+          g.gain.exponentialRampToValueAtTime(0.0001, t + i * 0.09 + 0.35);
+          o.connect(g); g.connect(ac.destination);
+          o.start(t + i * 0.09); o.stop(t + i * 0.09 + 0.4);
+        });
       },
       toggle() {
         muted = !muted;
@@ -458,6 +483,20 @@
       const bal = Sim.balanceAngle(sim, handling);
       if (sim.inWheelie && sim.theta > bal + 2 * DEG) hint('Past the balance point · brake', 0.3, true);
       else if (sim.inWheelie && hintTimer <= 0 && sim.wheelieDist > 10 && sim.wheelieDist < 14) hint('Feather the gas', 1.2);
+      else if (sim.inWheelie && hintTimer <= 0 && sim.wheelieDist > 35 && sim.wheelieDist < 39 && best(bike.id) < 60) hint('Ride lower to go faster', 1.6);
+      if (sim.inWheelie) {
+        const m = Math.floor(sim.wheelieDist / 50);
+        const bst = best(bike.id);
+        if (!passedBest && bst > 5 && sim.wheelieDist > bst) {
+          passedBest = true;
+          toast('New best', true);
+          audio.chime(true);
+        } else if (m > milestone) {
+          milestone = m;
+          toast(`${m * 50} m`);
+          audio.chime(false);
+        }
+      }
     }
 
     draw();
@@ -467,7 +506,9 @@
 
   function draw() {
     ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
-    const scale = Math.min(H / 6.2, W / 5.4);
+    // pull the camera back as speed builds so the hills ahead stay in view
+    zoom += ((1 - 0.24 * Math.min(1, sim.v / 28)) - zoom) * 0.03;
+    const scale = Math.min(H / 6.2, W / 5.4) * zoom;
     if (rider) camFocus += ((sim.x + rider.x) / 2 + 1 - camFocus) * 0.08;
     else camFocus = sim.x;
     const sx = shake > 0 ? (Math.random() - 0.5) * shake * 14 : 0;
@@ -528,6 +569,15 @@
       fill.classList.toggle('beat', bst > 0 && sim.wheelieDist > bst);
     }
   }
+
+  // Read-only view of the ride, used by automated playtests.
+  Object.defineProperty(window, 'wheelieState', {
+    get: () => sim && {
+      mode, status: sim.status, theta: sim.theta, omega: sim.omega, v: sim.v, lean: sim.lean,
+      dist: sim.wheelieDist, time: sim.wheelieTime, inWheelie: sim.inWheelie,
+      balance: Sim.balanceAngle(sim, handling), vmax: handling.vmax,
+    },
+  });
 
   resize();
   openMenu();

@@ -45,12 +45,19 @@ The track is a desert motocross course at dusk: layered mesas, Joshua trees, cou
 
 ## How the physics works
 
-`js/physics.js` is a small arcade model with no DOM, so it can be tested in Node:
+`js/physics.js` is a small arcade model with no DOM, so it can be tested in Node. The feel knobs live together in `TUNE`.
 
-- The bike pitches about the rear contact patch. The bike's acceleration pushes the rider and bike's centre of mass back (nose up). Braking does the opposite. Gravity pulls the nose down until the centre of mass is over the rear axle, which is the balance point. Past that point gravity pulls the bike over.
-- Each bike's handling comes from its specs. Launch acceleration scales with power-to-weight (log-compressed so the Varg is hard but still rideable), drive force fades towards the real top speed, and lighter bikes respond more to the rider leaning.
-- The terrain is seeded rolling hills plus small bumps. A bump under the rear wheel knocks the nose down, and a bump under the front wheel gives a small pop.
+- The bike pitches about the rear contact patch. Drive force at the tyre lifts the nose and the rear brake pulls it down. Gravity pulls the nose down until the centre of mass passes over the rear axle (the balance point), and past that it pulls the bike over.
+- Air drag acts at the centre of mass, so it cancels out of the pitch balance, as on a real bike. The throttle keeps its bite at top speed. (In the first version, drive faded to nothing near top speed, which made every wheelie uncontrollable after about 20 seconds.)
+- Drive is torque-limited at low speed and power-limited above, and drag is sized so each bike tops out at its real top speed. A steady wheelie therefore has a natural speed for each angle: ride lower to go faster, higher to slow down.
+- An arcade boost on the drive moment stands in for the suspension pop and body weight a real rider uses to get the front up. It eases off towards top speed.
+- Throttle and brake ramp over a fraction of a second, so on/off keys still give fine control: a tap is a small input, a hold is a big one.
+- Heavier, more powerful bikes rotate more slowly per unit of drive. The Varg still pops and loops out fastest, but you have time to catch it.
+- Let your speed bleed below about 5 km/h and the front comes down ("ran out of speed"), so you can't balance at a standstill.
+- The terrain is seeded long rollers plus small bumps. A bump under the rear wheel knocks the nose down, and a bump under the front wheel gives a small pop.
 - It runs at a fixed 240 Hz, so it behaves the same at any frame rate.
+
+The tuning was checked with simulated players that have human limits: 120–280 ms reactions, noisy judgement of the angle, on/off keys. They played every bike over many seeded runs, and the same controller also played the real game in a browser through key presses. With the current values, the Segway, Sur-Ron and Talaria can be held for a minute or more once you get the hang of them. The E Ride and Varg take noticeably more skill.
 
 ## Project layout
 
@@ -67,4 +74,4 @@ js/game.js        game loop, input, audio, menus, saved bests
 tests/            node:test suites for the physics and the art data
 ```
 
-Run the tests with `npm test` (Node 18+). They check that the art's calibration matches the physics (wheelbase and wheel size), that every bike can lift, that pinning the throttle loops out but leaves time to react, that more power makes the bike harder to hold, that a keyboard-style bot can hold a 150 m+ wheelie on every bike, and that the result doesn't depend on frame rate.
+Run the tests with `npm test` (Node 18+). They check that the art's calibration matches the physics (wheelbase and wheel size), that every bike can lift, that pinning the throttle loops out but leaves time to react, that more power makes the bike harder to hold, that a careful keyboard-style rider can hold a wheelie for a minute at real speed on every bike, that the throttle still lifts the nose at top speed, and that the result doesn't depend on frame rate.

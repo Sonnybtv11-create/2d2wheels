@@ -17,10 +17,15 @@ function ride(bike, policy, { seed = 1, maxT = 120 } = {}) {
   return { s, h, liftAt };
 }
 
-// A keyboard-style bot: on/off throttle and brake that holds the bike
-// a few degrees short of the balance point.
+// A keyboard-style bot: on/off throttle and brake. It rides in the green zone
+// below the balance point, but never lower than the angle its throttle can
+// hold at the current speed (what players learn by feel).
 const balancer = (s, h) => {
-  const err = Sim.balanceAngle(s, h) - 8 * D - s.theta - 0.25 * s.omega;
+  const bal = Sim.balanceAngle(s, h);
+  const push = Sim.pitchGainAt(h, s.v) * Sim.driveAt(h, s.v) - Sim.TUNE.roll;
+  const holdable = Math.atan2(9.81, Math.max(0.1, push)) - (Math.PI / 2 - bal);
+  const target = Math.min(bal - 3 * D, Math.max(bal - 10 * D, holdable + 4 * D));
+  const err = target - s.theta - 0.3 * s.omega;
   return { throttle: err > 0, brake: err < -6 * D, lean: 1 };
 };
 
@@ -79,12 +84,26 @@ test('the rear brake brings the front down', () => {
   assert.ok(braked.theta < coast.theta, 'braking pitches the nose down faster than coasting');
 });
 
-test('a careful rider can hold a long wheelie on every bike', () => {
+test('a careful rider can hold a wheelie for a minute on every bike, at speed', () => {
   for (const b of BIKES) {
     for (const seed of [1, 2, 3]) {
-      const { s } = ride(b, balancer, { seed });
-      assert.ok(s.wheelieDist > 150, `${b.name} seed ${seed}: ${s.wheelieDist.toFixed(1)} m`);
+      const { s, h } = ride(b, balancer, { seed, maxT: 60 });
+      assert.equal(s.status, 'riding', `${b.name} seed ${seed} ended (${s.status}) after ${s.wheelieTime.toFixed(1)} s`);
+      assert.ok(s.v > 0.3 * h.vmax, `${b.name} seed ${seed} crawled at ${(s.v * 3.6).toFixed(0)} km/h`);
     }
+  }
+});
+
+test('the throttle can still lift the nose at top speed', () => {
+  // Drag acts at the centre of mass and cancels out of the pitch balance, so
+  // drive force keeps lifting the front even when the bike can't go faster.
+  for (const b of BIKES) {
+    const h = Sim.deriveHandling(b);
+    const terrain = Sim.createTerrain(1);
+    const s = Sim.createState();
+    s.v = h.vmax; s.theta = 30 * D; s.throttle = 1; s.lean = 1;
+    Sim.substep(s, { throttle: true, lean: 1 }, h, terrain, Sim.FIXED_DT);
+    assert.ok(s.omega > 0, `${b.name}: omega ${s.omega.toFixed(3)}`);
   }
 });
 
