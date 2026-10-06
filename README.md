@@ -14,10 +14,12 @@ There's no build step and nothing to install. The display fonts load from Google
 | Retry / Menu / Sound | `R` / `Esc` / `M` | buttons |
 
 - Hold the throttle and lean back to lift the front. The gauge in the bottom-left shows how far up the front is.
-- **Green** is the zone where the wheelie is easy to hold. **Yellow** is the balance point. **Red** is past it, where the bike keeps going over unless you brake.
-- Your score is the distance you cover on the back wheel. The run ends when the front wheel comes back down (once it's been up for more than 0.75 s) or when you loop out.
-- Your best distance for each bike is saved in the browser.
-- As you get closer to top speed the motor has less pull left, so long wheelies need you to ride the balance point and use the rear brake to correct. That's how it works on a real bike too.
+- **Charge cells** (glowing ⚡ orbs) float along the track at different heights. Steer the front wheel's hub through them by raising or dropping the wheelie. Each cell is worth 25 × your combo, and the combo grows with every cell in a row (up to ×8) and resets when you miss one. Low cells sit under a comfortable wheelie. High ones sit past the leaned-back balance point, so stop leaning back to reach them.
+- **Sweet spot:** just under the balance point, distance scores double and the gauge glows. It's the riskiest place to be.
+- **Track features:** a yellow sign warns of whoops (a run of rhythmic bumps that knock the nose down) and mud (drags the bike, so you need more throttle, which lifts the nose).
+- The run ends when the front wheel comes back down (once it's been up for more than 0.75 s), when you loop out, or when you let the speed drop below about 5 km/h.
+- Your best score and distance for each bike are saved in the browser. There's a popup every 100 m and when you beat your best.
+- Ride lower to go faster, higher to slow down. Near the balance point the rear brake is your friend.
 
 ## The bikes
 

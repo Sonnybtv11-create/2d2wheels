@@ -15,10 +15,10 @@
 
   <div id="hud" hidden>
     <div class="hud-dist">
-      <div class="hud-label">Wheelie</div>
-      <div class="hud-big"><span id="hud-dist">0.0</span><small>m</small></div>
+      <div class="hud-label">Score <span id="hud-combo" class="combo"></span></div>
+      <div class="hud-big"><span id="hud-score">0</span></div>
       <div class="best-track" aria-hidden="true"><i id="hud-bestfill"></i></div>
-      <div id="hud-best" class="hud-sub">Best 0.0 m</div>
+      <div class="hud-sub"><span id="hud-dist">0.0</span> m · <span class="bolt">⚡</span><span id="hud-cells">0</span> · <span id="hud-best">Best 0</span></div>
     </div>
     <div class="hud-speed">
       <div class="hud-big"><span id="hud-speed">0</span><small>km/h</small></div>
@@ -82,6 +82,7 @@
         <span><span class="kbd">↓</span><span class="kbd">S</span> Rear brake</span>
         <span><span class="kbd">←</span><span class="kbd">A</span> Lean back</span>
         <span><span class="kbd">→</span><span class="kbd">D</span> Lean forward</span>
+        <span>Steer the front wheel through ⚡ cells to build a combo. Sit just under the balance point for double points.</span>
         <span class="fine">Specs from manufacturer and retailer listings; physics simplified. A fan game, not affiliated with these brands.</span>
       </footer>
     </div>
@@ -90,12 +91,12 @@
   <section id="results" class="overlay" hidden>
     <div class="slip">
       <div class="slip-head"><span id="res-title">Front wheel down</span><span id="res-bike"></span></div>
-      <div class="res-dist"><span id="res-dist">0.0</span><small>m</small></div>
+      <div class="res-dist"><span id="res-dist">0</span><small>pts</small></div>
       <div id="res-best" class="res-best"></div>
       <dl class="res-stats">
-        <div><dt>On the back wheel</dt><dd id="res-time">0.0 s</dd></div>
+        <div><dt>On the back wheel</dt><dd id="res-time">0.0 m</dd></div>
+        <div><dt>Charge cells</dt><dd id="res-cells">0</dd></div>
         <div><dt>Top speed</dt><dd id="res-speed">0 km/h</dd></div>
-        <div><dt>Highest pitch</dt><dd id="res-angle">0°</dd></div>
       </dl>
       <div class="slip-actions">
         <button id="btn-retry" class="ride" type="button">Again <span class="kbd">R</span></button>

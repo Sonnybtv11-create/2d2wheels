@@ -137,3 +137,42 @@ test('terrain is deterministic per seed and starts flat', () => {
   for (const x of [0, 10, 100, 523.7, 4000]) assert.equal(t1.height(x), t2.height(x));
   for (let x = 0; x < 60; x += 1) assert.equal(t1.slope(x), 0);
 });
+
+test('charge cells sit where the front hub is at their wheelie angle', () => {
+  for (const b of BIKES) {
+    const h = Sim.deriveHandling(b);
+    const terrain = Sim.createTerrain(5);
+    const p = terrain.pickups.find((q) => q.x > 60);
+    const s = Sim.createState();
+    s.theta = p.pitch;
+    // put the front hub right over the cell
+    s.x = p.x - h.wheelbase * Math.cos(p.pitch);
+    const [fx, fy] = Sim.frontAxle(s, h, terrain);
+    const py = terrain.height(p.x) + Sim.pickupHeight(p, h);
+    assert.ok(Math.hypot(fx - p.x, fy - py) < Sim.PICKUP_RADIUS, `${b.id}: off by ${Math.hypot(fx - p.x, fy - py).toFixed(3)} m`);
+  }
+});
+
+test('cells span low and high wheelies, and need a wheelie to reach', () => {
+  const terrain = Sim.createTerrain(9);
+  const pitches = terrain.pickups.slice(0, 80).map((p) => p.pitch / D);
+  assert.ok(Math.min(...pitches) <= 20 && Math.max(...pitches) >= 45);
+  const h = Sim.deriveHandling(BIKES[0]);
+  const lowest = Math.min(...terrain.pickups.map((p) => Sim.pickupHeight(p, h)));
+  assert.ok(lowest - Sim.PICKUP_RADIUS > h.wheelRadius, 'front hub on the ground cannot reach a cell');
+});
+
+test('mud slows the bike', () => {
+  const b = byId('surron-lbx');
+  const h = Sim.deriveHandling(b);
+  const terrain = Sim.createTerrain(2);
+  const mud = terrain.features.find((f) => f.type === 'mud');
+  const coast = (inMud) => {
+    const s = Sim.createState();
+    s.x = inMud ? mud.x0 + 1 : mud.x0 - 40;
+    s.v = 8;
+    for (let i = 0; i < 120; i++) Sim.substep(s, {}, h, terrain, Sim.FIXED_DT);
+    return s.v;
+  };
+  assert.ok(coast(true) < coast(false) - 0.3);
+});

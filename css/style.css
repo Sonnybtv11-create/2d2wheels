@@ -71,6 +71,14 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .hud-big small { font-size: 0.42em; margin-left: 4px; font-weight: 700; opacity: 0.85; }
 .hud-sub { font: 600 14px/1.3 var(--display); letter-spacing: 0.04em; opacity: 0.92; font-variant-numeric: tabular-nums; }
 .hud-bike { opacity: 0.7; margin-top: 2px; }
+.combo {
+  display: inline-block; margin-left: 6px; padding: 1px 7px;
+  border-radius: 4px; background: #7ff0ff; color: #0e2a31;
+  font: italic 800 14px/1.2 var(--display); letter-spacing: 0.04em;
+}
+.combo:empty { display: none; }
+.combo.hot { background: var(--accent); color: #241a05; }
+.bolt { color: #7ff0ff; margin-right: 2px; }
 .best-track { width: clamp(130px, 28vw, 220px); height: 4px; margin: 6px 0 4px; background: rgba(255, 255, 255, 0.22); border-radius: 2px; overflow: hidden; }
 .best-track i { display: block; height: 100%; width: 0; background: var(--accent); }
 .best-track i.beat { background: var(--ok); }

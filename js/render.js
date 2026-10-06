@@ -346,6 +346,13 @@
     const { scale, camX, toScreenY } = view;
     for (const p of parts) {
       const a = Math.max(0, 1 - p.age / p.life) * p.a;
+      if (p.spark) {
+        ctx.beginPath();
+        ctx.arc((p.x - camX) * scale, toScreenY(p.y), Math.max(1.2, p.r * scale), 0, TAU);
+        ctx.fillStyle = `rgba(${p.c},${a.toFixed(3)})`;
+        ctx.fill();
+        continue;
+      }
       const x = (p.x - camX) * scale, y = toScreenY(p.y), r = p.r * scale * (1.4 + p.age * 2.2);
       const g = ctx.createRadialGradient(x, y, 0, x, y, r);
       g.addColorStop(0, `rgba(${p.c},${a.toFixed(3)})`);
@@ -366,7 +373,7 @@
 
   // Pitch dial: a quarter circle from 0° (flat) to 90° (vertical), with a
   // digital readout beside it. (cx, cy) is the dial's pivot.
-  function drawGauge(ctx, cx, cy, r, theta, balance, crash) {
+  function drawGauge(ctx, cx, cy, r, theta, balance, crash, sweet) {
     const deg = Math.PI / 180;
     const a = (d) => Math.PI + d; // canvas angle: 0° points left, 90° points up
     ctx.save();
@@ -386,9 +393,17 @@
     ctx.lineCap = 'butt';
     const bw2 = r * 0.14;
     arc(0, balance - 22 * deg, 'rgba(255,255,255,0.16)', bw2);
-    arc(balance - 22 * deg, balance - 3 * deg, '#6fd38a', bw2);
-    arc(balance - 3 * deg, balance + 3 * deg, '#ffc531', bw2 * 1.4);
-    arc(balance + 3 * deg, crash, '#ff6a3d', bw2);
+    arc(balance - 22 * deg, balance - 7 * deg, '#6fd38a', bw2);
+    if (sweet) {
+      ctx.save();
+      ctx.shadowColor = '#ffc531';
+      ctx.shadowBlur = r * 0.4;
+      arc(balance - 7 * deg, balance + 2 * deg, '#ffd75e', bw2 * 1.9);
+      ctx.restore();
+    } else {
+      arc(balance - 7 * deg, balance + 2 * deg, '#ffc531', bw2 * 1.4);
+    }
+    arc(balance + 2 * deg, crash, '#ff6a3d', bw2);
     arc(crash, 90 * deg, '#a3162a', bw2);
     // ticks inside the band
     ctx.strokeStyle = 'rgba(255,255,255,0.55)';
@@ -418,12 +433,130 @@
     ctx.textBaseline = 'alphabetic';
     ctx.font = `600 ${Math.round(r * 0.17)}px ${FONT}`;
     ctx.fillStyle = 'rgba(255,255,255,0.6)';
-    ctx.fillText('PITCH', cx + r * 0.16, cy - r * 0.62);
+    ctx.fillText(sweet ? 'SWEET ×2' : 'PITCH', cx + r * 0.16, cy - r * 0.62);
     ctx.font = `italic 800 ${Math.round(r * 0.46)}px ${FONT}`;
-    ctx.fillStyle = theta > balance + 3 * deg ? '#ff6a3d' : '#fff';
+    ctx.fillStyle = theta > balance + 2 * deg ? '#ff6a3d' : sweet ? '#ffd75e' : '#fff';
     ctx.fillText(`${Math.round(theta / deg)}°`, cx + r * 0.14, cy - r * 0.16);
     ctx.restore();
   }
 
-  root.Render = { FONT, drawSky, drawTrackside, drawGround, drawFlag, drawShadow, drawParticles, drawVignette, drawGauge };
+
+  /* ---------------- pickups, features, popups ---------------- */
+
+  // Charge cells: a glowing orb with a lightning bolt. `heightOf(p)` gives
+  // the cell's height above the ground for the current bike.
+  function drawPickups(ctx, view, terrain, pickups, heightOf, t) {
+    const { scale, camX, toScreenY, w } = view;
+    const x0 = camX - 1, x1 = camX + w / scale + 1;
+    const r = scale * 0.13;
+    for (const p of pickups) {
+      if (p.x < x0) continue;
+      if (p.x > x1) break;
+      if (p.got) continue;
+      const sx = (p.x - camX) * scale;
+      const sy = toScreenY(terrain.height(p.x) + heightOf(p));
+      const dim = p.missed;
+      const pulse = 1 + 0.12 * Math.sin(t * 6 + p.x);
+      if (!dim) {
+        const g = ctx.createRadialGradient(sx, sy, r * 0.2, sx, sy, r * 2.6 * pulse);
+        g.addColorStop(0, 'rgba(120,240,255,0.55)');
+        g.addColorStop(1, 'rgba(120,240,255,0)');
+        ctx.fillStyle = g;
+        ctx.fillRect(sx - r * 3, sy - r * 3, r * 6, r * 6);
+      }
+      ctx.beginPath();
+      ctx.arc(sx, sy, r, 0, TAU);
+      ctx.fillStyle = dim ? 'rgba(90,90,100,0.45)' : '#16313a';
+      ctx.fill();
+      ctx.lineWidth = Math.max(1.5, r * 0.18);
+      ctx.strokeStyle = dim ? 'rgba(160,160,170,0.5)' : '#7ff0ff';
+      ctx.stroke();
+      // bolt
+      ctx.beginPath();
+      ctx.moveTo(sx + r * 0.15, sy - r * 0.7);
+      ctx.lineTo(sx - r * 0.35, sy + r * 0.08);
+      ctx.lineTo(sx + r * 0.02, sy + r * 0.08);
+      ctx.lineTo(sx - r * 0.15, sy + r * 0.7);
+      ctx.lineTo(sx + r * 0.38, sy - r * 0.12);
+      ctx.lineTo(sx + r * 0.02, sy - r * 0.12);
+      ctx.closePath();
+      ctx.fillStyle = dim ? 'rgba(200,200,210,0.5)' : '#ffe55c';
+      ctx.fill();
+    }
+  }
+
+  // Mud patches on the surface and warning boards ahead of each feature.
+  function drawFeatures(ctx, view, terrain) {
+    const { scale, camX, toScreenY, w } = view;
+    const x0 = camX - 15, x1 = camX + w / scale + 15;
+    for (const f of terrain.features) {
+      if (f.x1 < x0) continue;
+      if (f.x0 - 12 > x1) break;
+      if (f.type === 'mud') {
+        ctx.beginPath();
+        for (let x = f.x0; x <= f.x1; x += 0.25) {
+          const sx = (x - camX) * scale, sy = toScreenY(terrain.height(x)) - scale * 0.01;
+          if (x === f.x0) ctx.moveTo(sx, sy); else ctx.lineTo(sx, sy);
+        }
+        for (let x = f.x1; x >= f.x0; x -= 0.25) {
+          const edge = Math.min(1, (x - f.x0) / 1.2, (f.x1 - x) / 1.2);
+          ctx.lineTo((x - camX) * scale, toScreenY(terrain.height(x)) + scale * (0.06 + 0.22 * edge));
+        }
+        ctx.closePath();
+        ctx.fillStyle = '#4a2e1c';
+        ctx.fill();
+        // wet sheen
+        ctx.beginPath();
+        for (let x = f.x0 + 0.8; x <= f.x1 - 0.8; x += 0.25) {
+          const sx = (x - camX) * scale, sy = toScreenY(terrain.height(x)) + scale * 0.02;
+          if (x <= f.x0 + 0.8) ctx.moveTo(sx, sy); else ctx.lineTo(sx, sy);
+        }
+        ctx.lineWidth = Math.max(1, scale * 0.02);
+        ctx.strokeStyle = 'rgba(255,220,180,0.35)';
+        ctx.stroke();
+      }
+      drawSign(ctx, ((f.x0 - 10) - camX) * scale, toScreenY(terrain.height(f.x0 - 10)), scale, f.type === 'mud' ? 'MUD' : 'WHOOPS');
+    }
+  }
+
+  function drawSign(ctx, sx, sy, scale, label) {
+    const ph = scale * 1.1;
+    ctx.fillStyle = '#3c2f26';
+    ctx.fillRect(sx - scale * 0.025, sy - ph, scale * 0.05, ph);
+    const d = scale * 0.32;
+    const cy = sy - ph - d * 0.6;
+    ctx.save();
+    ctx.translate(sx, cy);
+    ctx.rotate(Math.PI / 4);
+    ctx.fillStyle = '#ffc531';
+    ctx.fillRect(-d / Math.SQRT2, -d / Math.SQRT2, d * Math.SQRT2, d * Math.SQRT2);
+    ctx.lineWidth = Math.max(1.5, scale * 0.025);
+    ctx.strokeStyle = '#1a1a1c';
+    ctx.strokeRect(-d / Math.SQRT2 * 0.85, -d / Math.SQRT2 * 0.85, d * Math.SQRT2 * 0.85, d * Math.SQRT2 * 0.85);
+    ctx.restore();
+    ctx.font = `800 ${Math.max(9, Math.round(scale * 0.11))}px ${FONT}`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillStyle = '#1a1a1c';
+    ctx.fillText(label, sx, cy + 1);
+    ctx.textBaseline = 'alphabetic';
+  }
+
+  // Floating score text anchored in the world.
+  function drawPopups(ctx, view, popups) {
+    const { scale, camX, toScreenY } = view;
+    ctx.textAlign = 'center';
+    for (const p of popups) {
+      const a = Math.max(0, 1 - p.age / p.life);
+      const sx = (p.x - camX) * scale, sy = toScreenY(p.y) - p.age * scale * 0.9;
+      ctx.font = `italic 800 ${Math.round(scale * (p.big ? 0.34 : 0.26))}px ${FONT}`;
+      ctx.lineWidth = 4;
+      ctx.strokeStyle = `rgba(20,12,16,${0.55 * a})`;
+      ctx.strokeText(p.text, sx, sy);
+      ctx.fillStyle = p.color.replace('A', a.toFixed(3));
+      ctx.fillText(p.text, sx, sy);
+    }
+  }
+
+  root.Render = { FONT, drawSky, drawTrackside, drawGround, drawFlag, drawShadow, drawParticles, drawVignette, drawGauge, drawPickups, drawFeatures, drawPopups };
 })(typeof self !== 'undefined' ? self : this);

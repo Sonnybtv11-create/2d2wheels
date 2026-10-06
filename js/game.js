@@ -30,11 +30,14 @@
   let particles = [];
   let stats = { topSpeed: 0, maxPitch: 0 };
   let milestone = 0, passedBest = false, zoom = 1;
+  let run = null; // score for the current ride
   let hintTimer = 0;
   let shake = 0;
   const keys = { throttle: false, brake: false, leanBack: false, leanFwd: false };
 
   function best(id) { return store.get('best.' + id, 0); }
+  function bestScore(id) { return store.get('bestScore.' + id, 0); }
+  const fmt = (n) => Math.round(n).toLocaleString('en-US');
 
   /* ---------- canvas sizing ---------- */
   let W = 0, H = 0, DPR = 1;
@@ -101,7 +104,8 @@
       specRow('Top speed', `${b.topSpeedKmh} km/h`, b.topSpeedKmh / SPEC_MAX.speed) +
       `<div class="spec-extra">${b.extra}</div>`;
     const bst = best(b.id);
-    $('bike-best').textContent = bst > 0 ? `${bst.toFixed(1)} m` : 'No wheelie yet';
+    const bsc = bestScore(b.id);
+    $('bike-best').textContent = bst > 0 ? `${fmt(bsc)} pts · ${bst.toFixed(0)} m` : 'No wheelie yet';
     $('bike-sources').innerHTML = 'Specs: ' + b.sources.map((u) => `<a href="${u}" target="_blank" rel="noopener">${new URL(u).hostname.replace(/^www\./, '')}</a>`).join(' · ');
   }
 
@@ -193,6 +197,7 @@
     particles = [];
     stats = { topSpeed: 0, maxPitch: 0 };
     milestone = 0; passedBest = false;
+    run = { score: 0, combo: 1, bestCombo: 1, cells: 0, next: 0, lastX: 0, sweet: false, popups: [] };
     camY = terrain.height(0);
     camFocus = 0;
   }
@@ -204,8 +209,9 @@
     mode = 'play';
     show('menu', false); show('results', false); show('hud', true); show('touch', isTouch);
     $('hud-bike').textContent = bike.name;
-    $('hud-best').textContent = `Best ${best(bike.id).toFixed(1)} m`;
+    $('hud-best').textContent = `Best ${fmt(bestScore(bike.id))}`;
     hint(isTouch ? 'Hold Gas + ◀ Lean' : 'Hold ↑ and ← to pop it', 2.5);
+    tip = 0;
     for (const k in keys) keys[k] = false;
     audio.unlock();
   }
@@ -213,18 +219,19 @@
   function finishRun() {
     mode = 'results';
     const crashed = sim.status === 'crashed';
-    const prev = best(bike.id);
-    const isBest = sim.score > prev;
-    if (isBest) store.set('best.' + bike.id, sim.score);
+    if (sim.score > best(bike.id)) store.set('best.' + bike.id, sim.score);
+    const prev = bestScore(bike.id);
+    const isBest = run.score > prev;
+    if (isBest) store.set('bestScore.' + bike.id, Math.round(run.score));
     $('res-title').textContent = crashed ? 'Looped out' : sim.stalled ? 'Ran out of speed' : 'Front wheel down';
     $('res-title').className = crashed ? 'crash' : '';
     $('res-bike').textContent = bike.name;
-    $('res-dist').textContent = sim.score.toFixed(1);
-    $('res-time').textContent = `${sim.wheelieTime.toFixed(1)} s`;
+    $('res-dist').textContent = fmt(run.score);
+    $('res-time').textContent = `${sim.score.toFixed(1)} m · ${sim.wheelieTime.toFixed(1)} s`;
+    $('res-cells').textContent = `${run.cells} · best combo ×${run.bestCombo}`;
     $('res-speed').textContent = `${Math.round(stats.topSpeed * 3.6)} km/h`;
-    $('res-angle').textContent = `${Math.round(stats.maxPitch / DEG)}°`;
     const rb = $('res-best');
-    rb.textContent = isBest ? (prev > 0 ? `New best, up from ${prev.toFixed(1)} m` : 'New best') : `Best ${prev.toFixed(1)} m`;
+    rb.textContent = isBest ? (prev > 0 ? `New best, up from ${fmt(prev)}` : 'New best') : `Best ${fmt(prev)}`;
     rb.className = 'res-best' + (isBest ? ' new' : '');
     show('results', true); show('touch', false);
     $('btn-retry').focus({ preventScroll: true });
@@ -336,6 +343,19 @@
         gain.gain.setTargetAtTime(active ? 0.015 + 0.05 * s.throttle : 0, t, 0.05);
         noiseGain.gain.setTargetAtTime(active ? Math.min(0.06, vr * 0.08) : 0, t, 0.1);
       },
+      // pickup zap, rising with the combo
+      zap(combo) {
+        if (!ac || muted) return;
+        const t = ac.currentTime, o = ac.createOscillator(), g = ac.createGain();
+        const f = 620 * Math.pow(1.1225, Math.min(8, combo) - 1);
+        o.type = 'square';
+        o.frequency.setValueAtTime(f, t);
+        o.frequency.exponentialRampToValueAtTime(f * 1.5, t + 0.08);
+        g.gain.setValueAtTime(0.045, t);
+        g.gain.exponentialRampToValueAtTime(0.0001, t + 0.16);
+        o.connect(g); g.connect(ac.destination);
+        o.start(t); o.stop(t + 0.18);
+      },
       // short two-note chime for milestones
       chime(high) {
         if (!ac || muted) return;
@@ -359,11 +379,75 @@
     };
   })();
 
+  /* ---------- scoring ---------- */
+  // Distance on the back wheel scores 1 point per metre, doubled in the sweet
+  // spot just under the balance point. Charge cells score 25 x combo; the
+  // combo grows with each cell in a row and resets when you miss one.
+  const CELL_POINTS = 25, MAX_COMBO = 8;
+  const TIPS = [
+    [4, 'Steer the front wheel through the ⚡ cells', 300],
+    [24, 'Sit just under the balance point for ×2', 300],
+    [60, 'Ride lower to go faster', 150],
+  ];
+  let tip = 0;
+
+  function popup(text, x, y, color, big) {
+    run.popups.push({ text, x, y, color, big, age: 0, life: 1.1 });
+  }
+
+  function updateScore(dt) {
+    for (const p of run.popups) p.age += dt;
+    run.popups = run.popups.filter((p) => p.age < p.life);
+    if (sim.status !== 'riding') { run.sweet = false; return; }
+    const bal = Sim.balanceAngle(sim, handling);
+    run.sweet = sim.inWheelie && sim.theta > bal - 7 * DEG && sim.theta < bal + 2 * DEG;
+    if (sim.inWheelie) run.score += Math.max(0, sim.x - run.lastX) * (run.sweet ? 2 : 1);
+    run.lastX = sim.x;
+
+    const fa = Sim.frontAxle(sim, handling, terrain);
+    const P = terrain.pickups;
+    while (run.next < P.length && P[run.next].x < fa[0] - 0.5) {
+      const p = P[run.next++];
+      if (p.got || !sim.inWheelie) continue;
+      p.missed = true;
+      if (run.combo > 1) popup('combo lost', p.x, terrain.height(p.x) + Sim.pickupHeight(p, handling) + 0.3, 'rgba(200,200,210,A)');
+      run.combo = 1;
+    }
+    for (let i = run.next; i < P.length && P[i].x < fa[0] + 0.5; i++) {
+      const p = P[i];
+      if (p.got || p.missed) continue;
+      const py = terrain.height(p.x) + Sim.pickupHeight(p, handling);
+      if (Math.hypot(p.x - fa[0], py - fa[1]) > Sim.PICKUP_RADIUS) continue;
+      p.got = true;
+      const pts = CELL_POINTS * run.combo;
+      run.score += pts;
+      run.cells++;
+      popup(run.combo > 1 ? `+${pts}  ×${run.combo}` : `+${pts}`, p.x, py + 0.35, run.combo >= 4 ? 'rgba(255,197,49,A)' : 'rgba(127,240,255,A)', run.combo >= 4);
+      run.combo = Math.min(MAX_COMBO, run.combo + 1);
+      run.bestCombo = Math.max(run.bestCombo, run.combo - 1 || 1);
+      sparks(p.x, py);
+      audio.zap(run.combo);
+    }
+  }
+
+  function sparks(x, y) {
+    for (let i = 0; i < 14; i++) {
+      const a = Math.random() * Math.PI * 2, sp = 1.5 + Math.random() * 3;
+      particles.push({ x, y, vx: Math.cos(a) * sp + sim.v * 0.6, vy: Math.sin(a) * sp, r: 0.025 + Math.random() * 0.03, age: 0, life: 0.35 + Math.random() * 0.3, a: 0.95, c: Math.random() < 0.5 ? '127,240,255' : '255,229,92', spark: true });
+    }
+  }
+
   /* ---------- dust ---------- */
   function emitDust(dt) {
     if (sim.status !== 'riding' && sim.status !== 'crashed') return;
     const slip = sim.status === 'crashed' ? 1 : sim.throttle * Math.max(0, 1 - sim.v / handling.vmax);
     const rate = (sim.v > 0.5 ? 25 : 0) * slip + (sim.status === 'crashed' && sim.v > 1 ? 40 : 0) + (sim.braking && sim.v > 2 ? 30 : 0);
+    if (sim.inMud && sim.v > 2 && sim.status === 'riding') {
+      for (let i = 0; i < 2; i++) particles.push({
+        x: sim.x - 0.05, y: terrain.height(sim.x) + 0.05, vx: -(1 + Math.random() * 2), vy: 1 + Math.random() * 2.2,
+        r: 0.03 + Math.random() * 0.04, age: 0, life: 0.6, a: 0.85, c: '74,46,28', spark: true,
+      });
+    }
     let n = rate * dt;
     while (n > 0) {
       if (Math.random() < n) {
@@ -469,6 +553,7 @@
       resultsDelay -= dt;
       if (resultsDelay <= 0) finishRun();
     }
+    if (mode === 'play') updateScore(dt);
     emitDust(dt);
     updateParticles(dt);
     updateRider(dt);
@@ -482,18 +567,20 @@
     if (mode === 'play' && sim.status === 'riding') {
       const bal = Sim.balanceAngle(sim, handling);
       if (sim.inWheelie && sim.theta > bal + 2 * DEG) hint('Past the balance point · brake', 0.3, true);
-      else if (sim.inWheelie && hintTimer <= 0 && sim.wheelieDist > 10 && sim.wheelieDist < 14) hint('Feather the gas', 1.2);
-      else if (sim.inWheelie && hintTimer <= 0 && sim.wheelieDist > 35 && sim.wheelieDist < 39 && best(bike.id) < 60) hint('Ride lower to go faster', 1.6);
+      else if (sim.inWheelie && hintTimer <= 0 && tip < TIPS.length && sim.wheelieDist > TIPS[tip][0]) {
+        if (bestScore(bike.id) < TIPS[tip][2]) hint(TIPS[tip][1], 1.8);
+        tip++;
+      }
       if (sim.inWheelie) {
-        const m = Math.floor(sim.wheelieDist / 50);
-        const bst = best(bike.id);
-        if (!passedBest && bst > 5 && sim.wheelieDist > bst) {
+        const m = Math.floor(sim.wheelieDist / 100);
+        const bsc = bestScore(bike.id);
+        if (!passedBest && bsc > 20 && run.score > bsc) {
           passedBest = true;
           toast('New best', true);
           audio.chime(true);
         } else if (m > milestone) {
           milestone = m;
-          toast(`${m * 50} m`);
+          toast(`${m * 100} m`);
           audio.chime(false);
         }
       }
@@ -522,6 +609,7 @@
     R.drawSky(ctx, W, H, camX, groundLine - scale * 0.4);
     R.drawTrackside(ctx, view, terrain);
     R.drawGround(ctx, view, terrain);
+    R.drawFeatures(ctx, view, terrain);
 
     if (mode !== 'menu') {
       const bst = best(bike.id);
@@ -534,7 +622,7 @@
     let pitch = sim.theta;
     if (sim.status === 'crashed') pitch = Sim.CRASH_ANGLE + Math.min(1, sim.crashT * 1.6) * (Math.PI - 0.15 - Sim.CRASH_ANGLE);
     if (sim.status !== 'crashed') R.drawShadow(ctx, view, terrain, sim.x, bike.look.wheelbase, pitch);
-    R.drawParticles(ctx, view, particles.filter((p) => p.r < 0.1));
+    R.drawParticles(ctx, view, particles.filter((p) => p.r < 0.1 && !p.spark));
     const flipLift = sim.status === 'crashed' ? Math.max(0, -Math.cos(pitch)) * (bike.look.wheelRadius + 0.98) : 0;
     ctx.save();
     ctx.translate((sim.x - view.camX) * scale, toScreenY(terrain.height(sim.x) + flipLift));
@@ -554,19 +642,26 @@
       Art.drawLooseRider(ctx, bike.id);
       ctx.restore();
     }
-    R.drawParticles(ctx, view, particles.filter((p) => p.r >= 0.1));
+    R.drawParticles(ctx, view, particles.filter((p) => p.r >= 0.1 || p.spark));
+    R.drawPickups(ctx, view, terrain, terrain.pickups, (p) => Sim.pickupHeight(p, handling), sim.time);
+    if (run && mode !== 'menu') R.drawPopups(ctx, view, run.popups);
     R.drawVignette(ctx, W, H);
 
     if (mode === 'play' || mode === 'results') {
       const r = Math.max(50, Math.min(70, W * 0.09));
-      R.drawGauge(ctx, 16 + r * 1.3, H - (isTouch ? 132 : 16) - r * 0.18, r, Math.min(sim.theta, Math.PI / 2), Sim.balanceAngle(sim, handling), Sim.CRASH_ANGLE);
+      R.drawGauge(ctx, 16 + r * 1.3, H - (isTouch ? 132 : 16) - r * 0.18, r, Math.min(sim.theta, Math.PI / 2), Sim.balanceAngle(sim, handling), Sim.CRASH_ANGLE, run && run.sweet);
       $('hud-dist').textContent = sim.wheelieDist.toFixed(1);
+      $('hud-score').textContent = fmt(run.score);
+      $('hud-cells').textContent = String(run.cells);
+      const cb = $('hud-combo');
+      cb.textContent = run.combo > 1 ? `×${run.combo}` : '';
+      cb.classList.toggle('hot', run.combo >= 4);
       $('hud-speed').textContent = String(Math.round(sim.v * 3.6));
       $('hud-mph').textContent = `${Math.round(sim.v * 2.23694)} mph`;
-      const bst = best(bike.id);
+      const bsc = bestScore(bike.id);
       const fill = $('hud-bestfill');
-      fill.style.width = bst > 0 ? `${Math.min(100, (sim.wheelieDist / bst) * 100)}%` : '0%';
-      fill.classList.toggle('beat', bst > 0 && sim.wheelieDist > bst);
+      fill.style.width = bsc > 0 ? `${Math.min(100, (run.score / bsc) * 100)}%` : '0%';
+      fill.classList.toggle('beat', bsc > 0 && run.score > bsc);
     }
   }
 
@@ -575,6 +670,10 @@
     get: () => sim && {
       mode, status: sim.status, theta: sim.theta, omega: sim.omega, v: sim.v, lean: sim.lean,
       dist: sim.wheelieDist, time: sim.wheelieTime, inWheelie: sim.inWheelie,
+      score: run ? run.score : 0, combo: run ? run.combo : 1, cells: run ? run.cells : 0,
+      frontX: Sim.frontAxle(sim, handling, terrain)[0],
+      upcoming: run ? terrain.pickups.slice(run.next, run.next + 4).filter((p) => !p.got && !p.missed).map((p) => ({ x: p.x, pitch: p.pitch })) : [],
+      leanAngle: handling.leanAngle,
       balance: Sim.balanceAngle(sim, handling), vmax: handling.vmax,
     },
   });

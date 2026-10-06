@@ -34,6 +34,7 @@
     throttleUp: 4, throttleDown: 7,
     brakeUp: 4, brakeDown: 10,
     leanRate: 4,
+    mudRoll: 6,         // rolling resistance multiplier in mud
     bumpKick: 0.12,     // extra nose-drop (rad/s per metre of bump) for each m/s of speed
   };
 
@@ -60,6 +61,7 @@
       // drive, so big power stays catchable rather than twitchy.
       pitchArm: TUNE.pitchArm * Math.pow(mass / 140, 0.25) * Math.pow(launch / 7, TUNE.powerDamp),
       wheelbase: (bike.look && bike.look.wheelbase) || 1.3,
+      wheelRadius: (bike.look && bike.look.wheelRadius) || 0.31,
     };
   }
 
@@ -93,40 +95,94 @@
     // Long rollers only: short, steep waves made high-speed wheelies a lottery.
     const base = (x) => ramp(x) * (1.1 * Math.sin(x / 41 + p1) + 0.45 * Math.sin(x / 17 + p2) + 0.05 * Math.sin(x / 7 + p3));
 
+    // Track features: whoops (a run of rhythmic bumps) and mud (drags the
+    // bike, so it needs more throttle, which lifts the nose).
+    const features = [];
+    let fx = 130;
+    while (fx < 20000) {
+      const len = 14 + rnd() * 10;
+      features.push({ type: rnd() < 0.55 ? 'whoops' : 'mud', x0: fx, x1: fx + len });
+      fx += len + 90 + rnd() * 90;
+    }
+    const inFeature = (x, pad) => features.some((f) => x > f.x0 - pad && x < f.x1 + pad);
+
     const bumps = [];
     let bx = 70;
     while (bx < 20000) {
       bx += 40 + rnd() * 80;
-      bumps.push({ x: bx, h: 0.06 + rnd() * 0.07 + Math.min(0.06, bx / 30000) });
+      if (!inFeature(bx, 4)) bumps.push({ x: bx, h: 0.06 + rnd() * 0.07 + Math.min(0.06, bx / 30000) });
+    }
+    for (const f of features) {
+      if (f.type !== 'whoops') continue;
+      for (let x = f.x0 + 1.5; x < f.x1; x += 3.2) bumps.push({ x, h: 0.06 + rnd() * 0.03 });
+    }
+    bumps.sort((a, b) => a.x - b.x);
+
+    // Charge pickups float in short lines at heights the front wheel reaches
+    // at a given wheelie angle, so collecting them means steering the pitch.
+    // Low lines sit under a comfortable wheelie, high ones above the
+    // leaned-back balance point (sit up to reach them).
+    const PATTERNS = [
+      [18, 25, 32, 40, 48], [48, 40, 32, 25, 18], [18, 18, 18], [48, 48, 48],
+      [20, 44, 20, 44], [32, 48, 32], [18, 32, 48, 32, 18], [26, 26, 26, 26],
+    ];
+    const pickups = [];
+    let px = 40;
+    while (px < 20000) {
+      const pat = PATTERNS[Math.floor(rnd() * PATTERNS.length)];
+      for (const deg of pat) { pickups.push({ x: px, pitch: deg * DEG }); px += 3.6; }
+      px += 22 + rnd() * 26;
     }
 
-    function bumpAt(x) {
-      // Binary search for the nearest bump at or after x - width.
+    // First bump index at or after x.
+    function firstBump(x) {
       let lo = 0, hi = bumps.length;
       while (lo < hi) {
         const mid = (lo + hi) >> 1;
-        if (bumps[mid].x < x - BUMP_HALF_WIDTH) lo = mid + 1; else hi = mid;
+        if (bumps[mid].x < x) lo = mid + 1; else hi = mid;
       }
-      const b = bumps[lo];
+      return lo;
+    }
+
+    function bumpAt(x) {
+      const b = bumps[firstBump(x - BUMP_HALF_WIDTH)];
       if (!b || Math.abs(x - b.x) > BUMP_HALF_WIDTH) return 0;
       const t = (x - b.x) / BUMP_HALF_WIDTH;
       return b.h * 0.5 * (1 + Math.cos(t * Math.PI));
     }
 
     return {
-      bumps,
+      bumps, features, pickups,
       height: (x) => base(x) + bumpAt(x),
       // Bumps are left out of the slope on purpose; they act through kicks instead.
       slope: (x) => (base(x + 0.05) - base(x - 0.05)) / 0.1,
       bumpsBetween(a, b) {
         const out = [];
-        for (const bump of bumps) {
-          if (bump.x > b) break;
-          if (bump.x > a) out.push(bump);
-        }
+        for (let i = firstBump(a); i < bumps.length && bumps[i].x <= b; i++) if (bumps[i].x > a) out.push(bumps[i]);
         return out;
       },
+      mudAt(x) {
+        for (const f of features) {
+          if (f.x0 > x) return false;
+          if (f.type === 'mud' && x < f.x1) return true;
+        }
+        return false;
+      },
     };
+  }
+
+  // Where the front axle is in the world (x along the track, y up).
+  function frontAxle(s, h, terrain) {
+    const ang = Math.atan(terrain.slope(s.x)) + s.theta;
+    const c = Math.cos(ang), sn = Math.sin(ang);
+    return [s.x + h.wheelbase * c - h.wheelRadius * sn, terrain.height(s.x) + h.wheelbase * sn + h.wheelRadius * c];
+  }
+
+  const PICKUP_RADIUS = 0.2;  // how close the front hub must pass (m)
+
+  // Height above the ground of the front hub at a pickup's wheelie angle.
+  function pickupHeight(p, h) {
+    return h.wheelbase * Math.sin(p.pitch) + h.wheelRadius * Math.cos(p.pitch);
   }
 
   function createState() {
@@ -169,7 +225,9 @@
     const moving = s.v > 0.01;
     const drive = s.throttle * driveAt(h, s.v);
     const brake = moving ? s.brake * TUNE.brakeDecel : 0;
-    const roll = moving ? TUNE.roll : 0;
+    const mud = terrain.mudAt ? terrain.mudAt(s.x) : false;
+    s.inMud = mud;
+    const roll = moving ? TUNE.roll * (mud ? TUNE.mudRoll : 1) : 0;
     const drag = h.dragK * s.v * s.v;
     let a = drive - brake - roll - drag - G * Math.sin(slopeAngle);
     if (s.v <= 0 && a < 0) a = 0;
@@ -201,7 +259,8 @@
     // Bumps: the rear wheel hitting one pushes the pivot up, which drops the
     // nose. The front wheel hitting one while it's on the ground gives a small pop.
     for (const b of terrain.bumpsBetween(x0, s.x)) {
-      s.omega -= b.h * (1.5 + TUNE.bumpKick * s.v);
+      // at speed the tyre skims the bump rather than climbing it, so the kick levels off
+      s.omega -= b.h * (1.5 + TUNE.bumpKick * Math.min(s.v, 15));
     }
     if (s.theta < 2 * DEG) {
       const wb = h.wheelbase || 1.3;
@@ -256,7 +315,7 @@
 
   const api = {
     DEG, CRASH_ANGLE, COM_ANGLE, FIXED_DT, MIN_WHEELIE_TIME, STALL_SPEED, TUNE,
-    deriveHandling, driveAt, pitchGainAt, createTerrain, createState, step, substep, balanceAngle, mulberry32,
+    deriveHandling, driveAt, pitchGainAt, frontAxle, pickupHeight, PICKUP_RADIUS, createTerrain, createState, step, substep, balanceAngle, mulberry32,
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.WheelieSim = api;
