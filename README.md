@@ -37,6 +37,8 @@ Specs come from manufacturer and retailer listings, and each bike's sources are 
 
 The bikes are vector drawings traced from side-on product photos, one per model, in the colourway shown in the menu: a red Stark Varg MX, a silver Segway X260, a green Sur-Ron Light Bee X, a blue Talaria Sting R MX4 and a black E Ride Pro-SS. `js/bikeart.js` stores each trace in the photo's own pixel coordinates along with a calibration (both axle centres, the real wheelbase and the tyre radius), and converts it to metres when the page loads. That way wheel size, seat height and peg position all keep their real proportions. The source photo for each bike is listed at the top of that file.
 
+The Sur-Ron goes further. It's vectorised straight from a high-resolution product photo: `tools/vectorize_bike.py` splits the photo into its frame-green, decal-yellow, fork-gold and neutral colours, cuts each into shade bands that follow the real lighting, and traces every band into polygons (`js/traced/surron-lbx.js`). The game draws the wheels, chain and lower fork legs itself so they can move.
+
 The rider is drawn in motocross gear (helmet with peak and goggles, neck brace, jersey, knee braces, boots). Knees and elbows are placed with two-bone IK, so the same rider fits every bike's seat, pegs and bars, and leaning moves the hips and torso. Each bike has a matching rider kit.
 
 The track is a desert motocross course at dusk: layered mesas, Joshua trees, course tape, distance boards, dust from the rear tyre, and a shadow under the bike.
@@ -58,6 +60,8 @@ css/style.css
 js/bikes.js       bike roster, specs and sources
 js/physics.js     wheelie simulation and terrain (no DOM)
 js/bikeart.js     traced bike art, wheels, rider and kits (no DOM)
+js/traced/        photo-vectorised bike layers (Sur-Ron)
+tools/            vectorize_bike.py, the photo vectoriser (needs OpenCV)
 js/render.js      canvas drawing: sky, track, dust, gauge
 js/game.js        game loop, input, audio, menus, saved bests
 tests/            node:test suites for the physics and the art data

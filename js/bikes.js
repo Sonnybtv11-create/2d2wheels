@@ -34,7 +34,7 @@
       topSpeedKmh: 75,
       extra: '60 V 40 Ah battery',
       blurb: 'The bike that started the light e-moto craze. Light and predictable, so it’s a good one to learn on.',
-      look: { wheelbase: 1.26, wheelRadius: 0.299, plate: '#97a33e', plateInk: '#f5e21b' },
+      look: { wheelbase: 1.26, wheelRadius: 0.311, plate: '#97a33e', plateInk: '#f5e21b' },
       sources: [
         'https://www.visordown.com/news/sur-ron-unveils-most-powerful-light-bee-model',
         'https://ridereview.com/products/sur-ron-light-bee-x',

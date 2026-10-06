@@ -8,7 +8,8 @@
  * Reference photos:
  *   Stark Varg MX     - elmox.de product image (red), facing right
  *   Segway X260       - segway.la product image (silver), facing right
- *   Sur-Ron LBX       - radmotousa.com product image (green), mirrored
+ *   Sur-Ron LBX       - radmotousa.com product image (green), mirrored and
+ *                       vectorised into colour layers (js/traced/surron-lbx.js)
  *   Talaria MX4       - talariacanada.com product image (blue), facing right
  *   E Ride Pro-SS     - chargedcycleworks.com product image (black), near side-on
  */
@@ -98,42 +99,27 @@
     },
 
     'surron-lbx': {
-      ref: { rear: [112, 380], front: [585, 378], wheelbase: 1.26, tyre: 112 },
+      // Body and frame come from the vectorised photo in js/traced/surron-lbx.js;
+      // these parts fill in what the wheels hide (swingarm end, fork legs, chain).
+      ref: { rear: [284, 870], front: [1334, 868], wheelbase: 1.26, tyre: 259 },
+      traced: 'surron-lbx',
       pal: {
-        body: '#97a33e', body2: '#6d7629', seat: '#1d1e21', frame: '#97a33e', metal: '#b9bdc3',
-        dark: '#1b1c1f', battery: '#1f2023', rim: '#1a1b1e', spoke: '#c4c7cc', accent: '#f5e21b',
-        forkUp: '#c9923f', forkLow: '#18191b', spring: '#d79a2b', shockBody: '#2a2b2f', chain: '#a88a4a', sprocket: '#b3b6bb',
+        rim: '#1a1b1e', spoke: '#c4c7cc', chain: '#b08d52', sprocket: '#c2a46a',
+        forkUp: '#c69f6c', forkLow: '#1c1d20', spring: '#c69f6c', shockBody: '#2a2b2f',
+        dark: '#1b1c1f', metal: '#b9bdc3', body: '#7a8032', accent: '#e5db48',
       },
-      sprocket: 38, drive: [345, 368], driveR: 11,
+      sprocket: 92, drive: [766, 810], driveR: 22,
       parts: [
-        { k: 'line', p: [[200, 188], [298, 250]], w: 9, c: 'dark' },
         { k: 'chain' },
-        { k: 'poly', c: 'frame', p: [[104, 372], [298, 320], [312, 338], [116, 394]], gloss: 1 },
-        { k: 'line', p: [[164, 354], [284, 310]], w: 11, c: 'frame' },
-        { k: 'line', p: [[226, 334], [236, 362]], w: 8, c: 'frame' },
-        { k: 'poly', c: 'dark', p: [[186, 262], [200, 270], [220, 290], [232, 310], [224, 312], [205, 292], [190, 276]], smooth: 1 },
-        { k: 'shock', a: [306, 292], b: [290, 228], w: 13 },
-        { k: 'poly', c: 'frame', p: [[462, 160], [482, 168], [478, 215], [440, 265], [420, 302], [410, 350], [390, 372], [330, 374], [304, 346], [298, 300], [316, 236], [340, 212], [400, 186]], gloss: 1 },
-        { k: 'poly', c: 'battery', p: [[346, 240], [460, 196], [440, 242], [416, 292], [402, 344], [336, 350], [322, 300]] },
-        { k: 'blocks', clip: [[350, 246], [452, 204], [434, 244], [410, 292], [398, 340], [340, 344], [328, 300]], c: 'accent', angle: -8, gap: 16 },
-        { k: 'circle', at: [345, 368], r: 31, c: 'dark' },
-        { k: 'ring', at: [345, 368], r: 22, w: 4, c: 'accent' },
-        { k: 'circle', at: [345, 368], r: 8, c: '#8b8f95' },
-        { k: 'poly', c: '#2a2c30', p: [[324, 186], [390, 175], [402, 181], [396, 202], [330, 206]], gloss: 0.4 },
-        { k: 'poly', c: 'seat', p: [[122, 160], [165, 166], [210, 172], [260, 180], [305, 186], [328, 190], [331, 200], [290, 203], [240, 197], [190, 187], [150, 175]], smooth: 1, gloss: 0.5 },
-        { k: 'rect', at: [240, 206], w: 7, h: 12, c: '#e1251b' },
-        { k: 'fender', p: [[480, 198], [540, 195], [612, 199], [600, 203], [540, 206], [490, 211]], c: 'dark' },
-        { k: 'fork', top: [466, 140], axle: [585, 378], split: 0.6, wUp: 18, wLow: 16 },
-        { k: 'line', p: [[560, 344], [566, 362]], w: 5, c: 'accent' },
-        { k: 'poly', c: 'dark', p: [[468, 206], [486, 214], [452, 264], [440, 268]] },
-        { k: 'poly', c: 'dark', p: [[452, 140], [482, 134], [486, 150], [456, 156]] },
-        { k: 'line', p: [[476, 140], [500, 132]], w: 6, c: 'dark' },
-        { k: 'circle', at: [506, 128], r: 13, c: 'dark' },
-        { k: 'circle', at: [512, 128], r: 8, c: '#ffe9b0' },
-        { k: 'bars', clamp: [466, 120], grip: [446, 98], c: 'dark' },
+        { k: 'poly', c: '#6c7230', p: [[250, 860], [300, 838], [420, 778], [540, 712], [600, 690], [660, 700], [690, 760], [660, 800], [560, 830], [420, 862], [300, 900], [258, 898]], smooth: 0.5 },
+        { k: 'line', p: [[1192, 612], [1334, 868]], w: 42, c: 'forkLow' },
+        { k: 'line', p: [[1180, 622], [1316, 862]], w: 6, c: 'rgba(255,255,255,0.16)' },
+        { k: 'line', p: [[1286, 772], [1304, 806]], w: 16, c: 'accent' },
+        { k: 'circle', at: [1334, 868], r: 24, c: 'forkLow' },
+        { k: 'traced' },
       ],
-      rider: { hip: [250, 177], peg: [276, 370], grip: [446, 98] },
-      kit: { jersey: '#f5e21b', jersey2: '#1d1e21', pants: '#1d1e21', pants2: '#97a33e', helmet: '#1d1e21', helmet2: '#f5e21b', visor: '#1d1e21', lens: '#ffd34d', boots: '#1d1e21', gloves: '#f5e21b' },
+      rider: { hip: [590, 392], peg: [655, 855], grip: [1000, 228] },
+      kit: { jersey: '#f2f2ee', jersey2: '#8a9a2e', pants: '#4a4f57', pants2: '#c9d36a', helmet: '#f2f2ee', helmet2: '#8a9a2e', visor: '#1d1e21', lens: '#ffd34d', boots: '#f2f2ee', gloves: '#1d1e21' },
     },
 
     'talaria-mx4': {
@@ -236,7 +222,33 @@
       out.parts.push(q);
     }
     out.rider = { hip: M(art.rider.hip), peg: M(art.rider.peg), grip: M(art.rider.grip) };
+    if (art.traced) {
+      const T = tracedData(art.traced);
+      out.layers = T.layers.map((L) => {
+        const rings = L.rings.map((r) => {
+          const pts = [];
+          for (let i = 0; i < r.length; i += 2) pts.push(M([r[i], r[i + 1]]));
+          return pts;
+        });
+        let path = null;
+        if (typeof Path2D !== 'undefined') {
+          path = new Path2D();
+          for (const ring of rings) {
+            path.moveTo(ring[0][0], ring[0][1]);
+            for (let i = 1; i < ring.length; i++) path.lineTo(ring[i][0], ring[i][1]);
+            path.closePath();
+          }
+        }
+        return { c: L.c, rings, path };
+      });
+    }
     return out;
+  }
+
+  function tracedData(id) {
+    if (root.TRACED && root.TRACED[id]) return root.TRACED[id];
+    if (typeof require === 'function') return require(`./traced/${id}.js`);
+    throw new Error(`missing traced art for ${id}`);
   }
 
   const COMPILED = {};
@@ -336,35 +348,53 @@
   function drawWheel(ctx, c, R, pal, spin, blur, disc, sprocketR) {
     const [cx, cy] = c;
     const rimR = R * 0.76;
-    // tyre
-    circle(ctx, c, R - 0.008, '#141517');
-    // knobs
+    // tyre carcass
+    circle(ctx, c, R - 0.02, '#151618');
+    // tread: big staggered knobs on the crown, smaller shoulder knobs between
     ctx.save();
     ctx.translate(cx, cy);
     ctx.rotate(spin);
-    ctx.fillStyle = '#1d1e21';
-    const knobs = 40;
+    const knobs = 50;
     for (let i = 0; i < knobs; i++) {
-      ctx.rotate(TAU / knobs);
-      ctx.fillRect(R - 0.012, -0.011, 0.02, 0.022);
+      // slightly irregular blocks, like a worn knobby
+      const j = Math.sin(i * 12.9898) * 43758.5453, n = j - Math.floor(j);
+      const w = 0.02 + n * 0.01, h = 0.017 + (1 - n) * 0.008;
+      ctx.save();
+      ctx.rotate((i * TAU) / knobs);
+      ctx.beginPath();
+      ctx.moveTo(R - h, -w / 2); ctx.lineTo(R, -w * 0.38); ctx.lineTo(R, w * 0.38); ctx.lineTo(R - h, w / 2);
+      ctx.closePath();
+      ctx.fillStyle = n > 0.5 ? '#232428' : '#1f2023';
+      ctx.fill();
+      ctx.fillStyle = 'rgba(255,255,255,0.09)';
+      ctx.fillRect(R - 0.004, -w * 0.38, 0.004, w * 0.76);
+      ctx.rotate(TAU / knobs / 2);
+      ctx.fillStyle = '#1c1d20';
+      ctx.fillRect(R - 0.032, -0.008, 0.014, 0.016);
+      ctx.restore();
     }
     ctx.restore();
-    // sidewall
+    // sidewall with a soft sheen on the upper half
     ctx.beginPath();
-    ctx.arc(cx, cy, R * 0.9, 0, TAU);
-    ctx.lineWidth = R * 0.12;
-    ctx.strokeStyle = '#212226';
+    ctx.arc(cx, cy, R * 0.85, 0, TAU);
+    ctx.lineWidth = R * 0.15;
+    ctx.strokeStyle = '#1f2023';
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(cx, cy, R * 0.87, Math.PI * 0.2, Math.PI * 0.8);
+    ctx.lineWidth = R * 0.05;
+    ctx.strokeStyle = 'rgba(255,255,255,0.05)';
     ctx.stroke();
     // rim
     ctx.beginPath();
     ctx.arc(cx, cy, rimR, 0, TAU);
-    ctx.lineWidth = 0.024;
+    ctx.lineWidth = 0.022;
     ctx.strokeStyle = pal.rim;
     ctx.stroke();
     ctx.beginPath();
-    ctx.arc(cx, cy, rimR + 0.006, Math.PI * 0.15, Math.PI * 0.85);
+    ctx.arc(cx, cy, rimR - 0.006, Math.PI * 0.15, Math.PI * 0.85);
     ctx.lineWidth = 0.004;
-    ctx.strokeStyle = 'rgba(255,255,255,0.35)';
+    ctx.strokeStyle = 'rgba(255,255,255,0.3)';
     ctx.stroke();
     // spokes (motion-blurred into a disc at speed)
     ctx.save();
@@ -372,13 +402,13 @@
     ctx.rotate(spin);
     ctx.globalAlpha = 1 - 0.75 * blur;
     ctx.strokeStyle = pal.spoke;
-    ctx.lineWidth = 0.0035;
+    ctx.lineWidth = 0.0032;
     ctx.beginPath();
-    const spokes = 32;
+    const spokes = 36;
     for (let i = 0; i < spokes; i++) {
       const a = (i * TAU) / spokes;
-      const off = (i % 2 ? 1 : -1) * 0.55;
-      ctx.moveTo(Math.cos(a) * 0.04, Math.sin(a) * 0.04);
+      const off = (i % 2 ? 1 : -1) * 0.5;
+      ctx.moveTo(Math.cos(a) * 0.045, Math.sin(a) * 0.045);
       ctx.lineTo(Math.cos(a + off) * (rimR - 0.01), Math.sin(a + off) * (rimR - 0.01));
     }
     ctx.stroke();
@@ -386,49 +416,62 @@
     if (blur > 0.05) {
       ctx.beginPath();
       ctx.arc(cx, cy, rimR - 0.012, 0, TAU);
-      ctx.fillStyle = `rgba(190,194,200,${0.18 * blur})`;
+      ctx.fillStyle = `rgba(190,194,200,${0.16 * blur})`;
       ctx.fill();
     }
-    // brake disc
-    if (disc) {
-      ctx.save();
-      ctx.translate(cx, cy);
-      ctx.rotate(spin);
-      ctx.beginPath();
-      ctx.arc(0, 0, disc, 0, TAU);
-      ctx.arc(0, 0, disc * 0.62, 0, TAU, true);
-      ctx.fillStyle = '#b5b9bf';
-      ctx.fill('evenodd');
-      ctx.fillStyle = '#6f7379';
-      for (let i = 0; i < 12; i++) {
-        const a = (i * TAU) / 12;
-        ctx.beginPath();
-        ctx.arc(Math.cos(a) * disc * 0.8, Math.sin(a) * disc * 0.8, 0.006, 0, TAU);
-        ctx.fill();
-      }
-      ctx.restore();
-    }
-    // sprocket
+    // sprocket sits behind the brake disc
     if (sprocketR) {
       ctx.save();
       ctx.translate(cx, cy);
       ctx.rotate(spin);
       ctx.beginPath();
-      const teeth = 40;
+      const teeth = 44;
       for (let i = 0; i <= teeth * 2; i++) {
         const a = (i * TAU) / (teeth * 2);
-        const r = i % 2 ? sprocketR : sprocketR - 0.008;
+        const r = i % 2 ? sprocketR : sprocketR - 0.007;
         ctx.lineTo(Math.cos(a) * r, Math.sin(a) * r);
       }
+      ctx.closePath();
+      ctx.moveTo(sprocketR * 0.55, 0);
+      ctx.arc(0, 0, sprocketR * 0.55, 0, TAU, true);
       ctx.fillStyle = pal.sprocket;
       ctx.fill();
-      ctx.fillStyle = 'rgba(0,0,0,0.35)';
-      for (let i = 0; i < 6; i++) {
-        const a = (i * TAU) / 6;
+      ctx.restore();
+    }
+    // wave brake disc with drilled holes
+    if (disc) {
+      ctx.save();
+      ctx.translate(cx, cy);
+      ctx.rotate(spin);
+      ctx.beginPath();
+      const waves = 12;
+      for (let i = 0; i <= waves * 4; i++) {
+        const a = (i * TAU) / (waves * 4);
+        const r = disc * (i % 4 === 0 ? 0.94 : 1);
+        ctx.lineTo(Math.cos(a) * r, Math.sin(a) * r);
+      }
+      ctx.closePath();
+      ctx.moveTo(disc * 0.7, 0);
+      ctx.arc(0, 0, disc * 0.7, 0, TAU, true);
+      ctx.fillStyle = '#b9bdc3';
+      ctx.fill();
+      ctx.fillStyle = '#5f6369';
+      for (let i = 0; i < 18; i++) {
+        const a = (i * TAU) / 18;
         ctx.beginPath();
-        ctx.arc(Math.cos(a) * sprocketR * 0.55, Math.sin(a) * sprocketR * 0.55, sprocketR * 0.22, 0, TAU);
+        ctx.arc(Math.cos(a) * disc * 0.84, Math.sin(a) * disc * 0.84, 0.0045, 0, TAU);
         ctx.fill();
       }
+      // carrier spokes to the hub
+      ctx.strokeStyle = '#8d9197';
+      ctx.lineWidth = 0.01;
+      ctx.beginPath();
+      for (let i = 0; i < 5; i++) {
+        const a = (i * TAU) / 5;
+        ctx.moveTo(Math.cos(a) * 0.04, Math.sin(a) * 0.04);
+        ctx.lineTo(Math.cos(a + 0.3) * disc * 0.72, Math.sin(a + 0.3) * disc * 0.72);
+      }
+      ctx.stroke();
       ctx.restore();
     }
     // hub
@@ -584,6 +627,12 @@
       case 'chain': drawChain(ctx, art, spin); break;
       case 'fork': drawFork(ctx, q, pal); break;
       case 'stripes': case 'fins': case 'grid': case 'blocks': drawPattern(ctx, q, pal); break;
+      case 'traced':
+        for (const L of art.layers) {
+          ctx.fillStyle = L.c;
+          if (L.path) ctx.fill(L.path, 'evenodd');
+        }
+        break;
       case 'bars':
         stroke(ctx, [q.clamp, [q.clamp[0] - 0.02, q.clamp[1] + 0.03], q.grip], 0.024, col(pal, q.c));
         stroke(ctx, [[q.grip[0] + 0.035, q.grip[1] + 0.008], [q.grip[0] - 0.03, q.grip[1] - 0.006]], 0.034, '#101113');
@@ -647,17 +696,17 @@
   function drawLeg(ctx, p, kit, dim) {
     const k = (c) => (dim ? shade(c, -0.4) : c);
     // thigh, with the coloured side panel of the pants
-    limb(ctx, p.hip, p.knee, 0.2, 0.14, k(kit.pants));
+    limb(ctx, p.hip, p.knee, 0.17, 0.125, k(kit.pants));
     if (!dim) limb(ctx, at(p.hip, p.knee, 0.15), at(p.hip, p.knee, 0.85), 0.05, 0.035, kit.pants2, false);
-    limb(ctx, p.knee, p.foot, 0.13, 0.1, k(kit.pants));
+    limb(ctx, p.knee, p.foot, 0.115, 0.095, k(kit.pants));
     // knee brace
     ctx.beginPath();
-    ctx.ellipse(p.knee[0], p.knee[1], 0.07, 0.06, 0, 0, TAU);
+    ctx.ellipse(p.knee[0], p.knee[1], 0.062, 0.054, 0, 0, TAU);
     ctx.fillStyle = dim ? '#1d1e21' : '#2f3136';
     ctx.fill();
     // MX boot: tall shaft, flat sole along the peg
     const top = at(p.knee, p.foot, 0.4);
-    limb(ctx, top, p.foot, 0.135, 0.12, k(kit.boots));
+    limb(ctx, top, p.foot, 0.125, 0.11, k(kit.boots));
     ctx.beginPath();
     ctx.moveTo(p.foot[0] - 0.08, p.foot[1] + 0.035);
     ctx.lineTo(p.foot[0] + 0.1, p.foot[1] + 0.02);
