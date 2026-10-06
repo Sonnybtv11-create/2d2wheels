@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+  <title>2D2Wheels</title>
+  <meta name="description" content="A 2D wheelie game with five real electric dirt bikes.">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <canvas id="game"></canvas>
+
+  <div id="hud" hidden>
+    <div class="hud-left">
+      <div class="hud-label">Wheelie</div>
+      <div id="hud-dist" class="hud-big">0.0 m</div>
+      <div id="hud-best" class="hud-small">Best 0.0 m</div>
+    </div>
+    <div class="hud-right">
+      <div id="hud-bike" class="hud-small"></div>
+      <div id="hud-speed" class="hud-big">0 km/h</div>
+      <div id="hud-mph" class="hud-small">0 mph</div>
+    </div>
+    <div id="hud-hint" class="hud-hint"></div>
+    <div class="hud-buttons">
+      <button id="btn-sound" class="icon-btn" aria-label="Toggle sound" title="Sound (M)">🔊</button>
+      <button id="btn-menu" class="icon-btn" aria-label="Back to bike select" title="Menu (Esc)">☰</button>
+    </div>
+  </div>
+
+  <div id="touch" hidden>
+    <div class="touch-group">
+      <button class="touch-btn" data-key="brake">BRAKE</button>
+      <button class="touch-btn" data-key="leanBack">◀ LEAN</button>
+    </div>
+    <div class="touch-group">
+      <button class="touch-btn" data-key="leanFwd">LEAN ▶</button>
+      <button class="touch-btn throttle" data-key="throttle">GAS</button>
+    </div>
+  </div>
+
+  <section id="menu" class="overlay">
+    <div class="panel">
+      <h1>2D2Wheels</h1>
+      <p class="tag">Pick a bike, get the front wheel up, and see how far you can ride on the back wheel.</p>
+      <div id="bike-list" class="bike-list"></div>
+      <div id="bike-detail"></div>
+      <div class="menu-actions">
+        <button id="btn-start" class="primary">Ride <span class="kbd">Enter</span></button>
+      </div>
+      <div class="controls">
+        <div><span class="kbd">↑</span>/<span class="kbd">W</span>/<span class="kbd">Space</span> throttle</div>
+        <div><span class="kbd">↓</span>/<span class="kbd">S</span> rear brake (drops the front)</div>
+        <div><span class="kbd">←</span>/<span class="kbd">A</span> lean back · <span class="kbd">→</span>/<span class="kbd">D</span> lean forward</div>
+        <div>Keep the needle in the green zone. If it goes past the balance point you loop out.</div>
+      </div>
+      <p class="fine">Specs are from manufacturer and retailer listings, and the riding physics are simplified. This is a fan game and isn't affiliated with any of these brands.</p>
+    </div>
+  </section>
+
+  <section id="results" class="overlay" hidden>
+    <div class="panel small">
+      <h2 id="res-title">Front wheel down</h2>
+      <div id="res-dist" class="res-dist">0.0 m</div>
+      <div id="res-detail" class="res-detail"></div>
+      <div id="res-best" class="res-best"></div>
+      <div class="menu-actions">
+        <button id="btn-retry" class="primary">Again <span class="kbd">R</span></button>
+        <button id="btn-change">Change bike <span class="kbd">Esc</span></button>
+      </div>
+    </div>
+  </section>
+
+  <script src="js/bikes.js"></script>
+  <script src="js/physics.js"></script>
+  <script src="js/render.js"></script>
+  <script src="js/game.js"></script>
+</body>
+</html>

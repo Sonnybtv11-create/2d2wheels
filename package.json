@@ -1,0 +1,11 @@
+{
+  "name": "2d2wheels",
+  "version": "1.0.0",
+  "description": "A 2D wheelie game with five real electric dirt bikes.",
+  "private": true,
+  "scripts": {
+    "test": "node --test tests/*.test.js",
+    "start": "python3 -m http.server 8080"
+  },
+  "license": "MIT"
+}
