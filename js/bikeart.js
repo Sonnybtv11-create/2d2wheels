@@ -348,8 +348,12 @@
   function drawWheel(ctx, c, R, pal, spin, blur, disc, sprocketR) {
     const [cx, cy] = c;
     const rimR = R * 0.76;
-    // tyre carcass
-    circle(ctx, c, R - 0.02, '#151618');
+    // tyre carcass: a ring, so the wheel stays see-through between the spokes
+    ctx.beginPath();
+    ctx.arc(cx, cy, R - 0.02, 0, TAU);
+    ctx.arc(cx, cy, rimR + 0.008, 0, TAU, true);
+    ctx.fillStyle = '#151618';
+    ctx.fill();
     // tread: big staggered knobs on the crown, smaller shoulder knobs between
     ctx.save();
     ctx.translate(cx, cy);
