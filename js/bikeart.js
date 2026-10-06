@@ -17,6 +17,7 @@
   'use strict';
 
   const TAU = Math.PI * 2;
+  const FORK_RAKE = 25 * Math.PI / 180;
 
   /* ------------------------------------------------------------------ */
   /* Traced art                                                          */
@@ -58,6 +59,7 @@
         { k: 'bars', clamp: [452, 194], grip: [410, 186], c: 'frame' },
       ],
       rider: { hip: [290, 246], peg: [284, 426], grip: [410, 186] },
+      light: [470, 228], // the MX bike has no lamp; a bar-mounted light for night runs
       kit: { jersey: '#d4111c', jersey2: '#ffffff', pants: '#1f2024', pants2: '#d4111c', helmet: '#f4f4f4', helmet2: '#d4111c', visor: '#1b1c20', lens: '#ff8a3d', boots: '#f2f2f2', gloves: '#1f2024' },
     },
 
@@ -95,6 +97,7 @@
         { k: 'bars', clamp: [452, 172], grip: [416, 160], c: 'dark' },
       ],
       rider: { hip: [256, 232], peg: [295, 404], grip: [416, 160] },
+      light: [478, 182],
       kit: { jersey: '#dfe2e6', jersey2: '#e1251b', pants: '#2d3036', pants2: '#e1251b', helmet: '#c9ccd1', helmet2: '#2d3036', visor: '#1e2024', lens: '#7fd3ff', boots: '#dfe2e6', gloves: '#2d3036' },
     },
 
@@ -112,13 +115,14 @@
       parts: [
         { k: 'chain' },
         { k: 'poly', c: '#6c7230', p: [[250, 860], [300, 838], [420, 778], [540, 712], [600, 690], [660, 700], [690, 760], [660, 800], [560, 830], [420, 862], [300, 900], [258, 898]], smooth: 0.5 },
-        { k: 'line', p: [[1192, 612], [1334, 868]], w: 42, c: 'forkLow' },
-        { k: 'line', p: [[1180, 622], [1316, 862]], w: 6, c: 'rgba(255,255,255,0.16)' },
-        { k: 'line', p: [[1286, 772], [1304, 806]], w: 16, c: 'accent' },
-        { k: 'circle', at: [1334, 868], r: 24, c: 'forkLow' },
+        { k: 'line', p: [[1192, 612], [1334, 868]], w: 42, c: 'forkLow', end: 'front' },
+        { k: 'line', p: [[1180, 622], [1316, 862]], w: 6, c: 'rgba(255,255,255,0.16)', move: 'front' },
+        { k: 'line', p: [[1286, 772], [1304, 806]], w: 16, c: 'accent', move: 'front' },
+        { k: 'circle', at: [1334, 868], r: 24, c: 'forkLow', move: 'front' },
         { k: 'traced' },
       ],
       rider: { hip: [590, 392], peg: [655, 855], grip: [1000, 228] },
+      light: [1100, 272],
       kit: { jersey: '#f2f2ee', jersey2: '#8a9a2e', pants: '#4a4f57', pants2: '#c9d36a', helmet: '#f2f2ee', helmet2: '#8a9a2e', visor: '#1d1e21', lens: '#ffd34d', boots: '#f2f2ee', gloves: '#1d1e21' },
     },
 
@@ -156,6 +160,7 @@
         { k: 'bars', clamp: [396, 144], grip: [376, 140], c: 'dark' },
       ],
       rider: { hip: [226, 211], peg: [264, 374], grip: [376, 140] },
+      light: [428, 170],
       kit: { jersey: '#1f62e0', jersey2: '#ffffff', pants: '#1b1c1f', pants2: '#1f62e0', helmet: '#ffffff', helmet2: '#1f62e0', visor: '#1b1c1f', lens: '#9fd0ff', boots: '#1b1c1f', gloves: '#1f62e0' },
     },
 
@@ -193,6 +198,7 @@
         { k: 'bars', clamp: [474, 64], grip: [392, 58], c: 'dark' },
       ],
       rider: { hip: [282, 122], peg: [300, 302], grip: [392, 58] },
+      light: [494, 68],
       kit: { jersey: '#16171a', jersey2: '#e0262d', pants: '#16171a', pants2: '#5a5d63', helmet: '#16171a', helmet2: '#e0262d', visor: '#16171a', lens: '#ff5a3d', boots: '#e9e9ea', gloves: '#16171a' },
     },
   };
@@ -222,6 +228,7 @@
       out.parts.push(q);
     }
     out.rider = { hip: M(art.rider.hip), peg: M(art.rider.peg), grip: M(art.rider.grip) };
+    out.light = M(art.light || art.rider.grip);
     if (art.traced) {
       const T = tracedData(art.traced);
       out.layers = T.layers.map((L) => {
@@ -487,8 +494,8 @@
   /* Components                                                          */
   /* ------------------------------------------------------------------ */
 
-  function drawFork(ctx, q, pal) {
-    const { top, axle, split, wUp, wLow } = q;
+  function drawFork(ctx, q, pal, axle) {
+    const { top, split, wUp, wLow } = q;
     const mid = [top[0] + (axle[0] - top[0]) * split, top[1] + (axle[1] - top[1]) * split];
     // outer (upper) tubes, lower legs, and a short polished stanchion between them
     stroke(ctx, [top, mid], wUp, pal.forkUp, 'butt');
@@ -545,7 +552,7 @@
 
   function drawChain(ctx, art, spin) {
     // Belt of links between the drive sprocket and the rear sprocket.
-    const rear = [0, art.R], d = art.drive;
+    const rear = art._dyn.rear, d = art.drive;
     const r1 = art.sprocketR, r2 = art.driveR;
     const ang = Math.atan2(d[1] - rear[1], d[0] - rear[0]);
     const n = [-Math.sin(ang), Math.cos(ang)];
@@ -617,8 +624,18 @@
         fillShape(ctx, q.p, col(pal, q.c), { smooth: 1, gloss: 0.8 });
         if (q.edge) stroke(ctx, q.p.slice(0, 4), 0.008, col(pal, q.edge));
         break;
-      case 'line': stroke(ctx, q.p, q.w, col(pal, q.c)); break;
-      case 'circle': circle(ctx, q.at, q.r, col(pal, q.c)); break;
+      case 'line': {
+        let pts = q.p;
+        if (q.end === 'front') pts = [...pts.slice(0, -1), art._dyn.front];
+        else if (q.move === 'front') pts = pts.map(([x, y]) => [x + art._dyn.shift[0], y + art._dyn.shift[1]]);
+        stroke(ctx, pts, q.w, col(pal, q.c));
+        break;
+      }
+      case 'circle': {
+        const at = q.move === 'front' ? [q.at[0] + art._dyn.shift[0], q.at[1] + art._dyn.shift[1]] : q.at;
+        circle(ctx, at, q.r, col(pal, q.c));
+        break;
+      }
       case 'ring':
         ctx.beginPath(); ctx.arc(q.at[0], q.at[1], q.r, 0, TAU);
         ctx.lineWidth = q.w; ctx.strokeStyle = col(pal, q.c); ctx.stroke();
@@ -629,7 +646,7 @@
         break;
       case 'shock': drawShock(ctx, q, pal); break;
       case 'chain': drawChain(ctx, art, spin); break;
-      case 'fork': drawFork(ctx, q, pal); break;
+      case 'fork': drawFork(ctx, q, pal, art._dyn.front); break;
       case 'stripes': case 'fins': case 'grid': case 'blocks': drawPattern(ctx, q, pal); break;
       case 'traced':
         for (const L of art.layers) {
@@ -841,8 +858,14 @@
       drawArm(ctx, far, art.kit, true);
     }
 
-    drawWheel(ctx, [0, art.R], art.R, art.pal, spin, blur, art.R * 0.32, art.sprocketR);
-    drawWheel(ctx, [art.WB, art.R], art.R, art.pal, spin, blur, art.R * 0.38, 0);
+    // Suspension: the rear wheel moves up and down against the chassis, the
+    // front wheel slides along the fork. Offsets are from static sag,
+    // positive towards the chassis.
+    const fo = opts.frontOff || 0, ro = opts.rearOff || 0;
+    const fu = [-Math.sin(FORK_RAKE), Math.cos(FORK_RAKE)];
+    art._dyn = { front: [art.WB + fo * fu[0], art.R + fo * fu[1]], rear: [0, art.R + ro], shift: [fo * fu[0], fo * fu[1]] };
+    drawWheel(ctx, art._dyn.rear, art.R, art.pal, spin, blur, art.R * 0.32, art.sprocketR);
+    drawWheel(ctx, art._dyn.front, art.R, art.pal, opts.frontSpin !== undefined ? -opts.frontSpin : spin, blur, art.R * 0.38, 0);
     for (const q of art.parts) drawPart(ctx, q, art, spin);
 
     if (rider) {
@@ -868,7 +891,7 @@
   function info(id) {
     const art = COMPILED[id];
     const p = pose(art, 0);
-    return { R: art.R, WB: art.WB, hip: p.hip };
+    return { R: art.R, WB: art.WB, hip: p.hip, light: art.light };
   }
 
   const api = { drawBike, drawLooseRider, info, ART, COMPILED };

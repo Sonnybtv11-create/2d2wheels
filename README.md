@@ -1,6 +1,6 @@
 # 2D2Wheels
 
-A 2D wheelie game in the browser. Pick one of five real electric dirt bikes, get the front wheel up, and ride as far as you can on the back wheel without looping out or setting the front down.
+A 2D wheelie game in the browser. Pick one of five real electric dirt bikes, pop the front wheel up and keep it there: over logs, rocks and tyre stacks, through mud and puddles, and away from the police car on your tail. Choose the time of day and the weather, or let the game pick.
 
 There's no build step and nothing to install. The display fonts load from Google Fonts; offline, the page falls back to system fonts. Open `index.html` in a browser, or serve the folder (`npm start` runs `python3 -m http.server 8080`). It works on desktop and on phones (on-screen buttons appear on touch devices).
 
@@ -9,17 +9,26 @@ There's no build step and nothing to install. The display fonts load from Google
 | Action | Keyboard | Touch |
 | --- | --- | --- |
 | Throttle | `↑` / `W` / `Space` | GAS |
-| Rear brake (drops the front) | `↓` / `S` | BRAKE |
+| Brake (drops the front) | `↓` / `S` | BRAKE |
 | Lean back / forward | `←` `A` / `→` `D` | ◀ LEAN / LEAN ▶ |
 | Retry / Menu / Sound | `R` / `Esc` / `M` | buttons |
 
-- Hold the throttle and lean back to lift the front. The gauge in the bottom-left shows how far up the front is.
-- **Charge cells** (glowing ⚡ orbs) float along the track at different heights. Steer the front wheel's hub through them by raising or dropping the wheelie. Each cell is worth 25 × your combo, and the combo grows with every cell in a row (up to ×8) and resets when you miss one. Low cells sit under a comfortable wheelie. High ones sit past the leaned-back balance point, so stop leaning back to reach them.
-- **Sweet spot:** just under the balance point, distance scores double and the gauge glows. It's the riskiest place to be.
-- **Track features:** a yellow sign warns of whoops (a run of rhythmic bumps that knock the nose down) and mud (drags the bike, so you need more throttle, which lifts the nose).
-- The run ends when the front wheel comes back down (once it's been up for more than 0.75 s), when you loop out, or when you let the speed drop below about 5 km/h.
-- Your best score and distance for each bike are saved in the browser. There's a popup every 100 m and when you beat your best.
-- Ride lower to go faster, higher to slow down. Near the balance point the rear brake is your friend.
+- **The pop:** on the gas, snap into a lean-back and the front comes up. Dip forward first to load the fork for a bigger pop. Then hold the wheelie with the throttle and the brake.
+- **The front wheel can come down.** Riding on two wheels is fine, but you're faster on one: in a wheelie the bike slips through the air more easily and can go past its usual top speed. The gauge in the bottom-left shows how far up the front is.
+- **Obstacles:** logs and rocks can be ridden over, but they knock speed off and jolt the suspension. Tyre stacks can't: get the front wheel over them or you go over the bars. Cones get knocked flying. Clearing an obstacle with the front up scores a bonus. A marker on the right edge warns you about the next obstacle before it comes on screen.
+- **Police:** a cruiser sets off a few seconds after you, and it gets faster the longer you ride. After about a minute it's faster than any bike on two wheels, so you need to wheelie to stay ahead. If it reaches you, you're busted. Letting it get within a few metres and then pulling away scores a close call.
+- **Scoring:** 1 point per metre on two wheels, 2 on the back wheel and 4 in the sweet spot just under the balance point (the gauge glows). Plus bonuses for obstacles cleared, cones and close calls.
+- **The strip at the top** shows the police behind you, then the obstacles (tyre stacks in red), mud, whoops and puddles ahead.
+- A run ends when you loop out, go over the bars, hit a tyre stack or get busted. Your best score and furthest distance for each bike are saved in the browser.
+
+### Time of day and weather
+
+Pick them in the garage. **Sunset** starts in daylight and runs into the night over about a minute; dawn does the opposite, and day and night barely change. The sky, mesas and ground colours follow the sun. When it gets dark the bike's headlight clicks on (it points wherever the bike points, so it lights up the sky in a big wheelie), and the police car's headlights and light bar light the track.
+
+- **Windy:** gusts come and go. The tape bellies, windsocks swing, the scrub sways, and dust and leaves blow across the screen. A headwind slows you and lifts the nose; a tailwind does the opposite. The HUD shows the wind's speed and direction.
+- **Rain:** streaks blow sideways with the wind and your speed, and splash on the ground. The track gets wet (less grip), puddles fill with water (even less grip, and a rooster tail of spray), and the dust settles.
+- **Storm:** heavy rain, strong wind, dark clouds, lightning flashes, and thunder that rolls in a moment later.
+- **Random** picks one of these each run.
 
 ## The bikes
 
@@ -43,23 +52,24 @@ The Sur-Ron goes further. It's vectorised straight from a high-resolution produc
 
 The rider is drawn in motocross gear (helmet with peak and goggles, neck brace, jersey, knee braces, boots). Knees and elbows are placed with two-bone IK, so the same rider fits every bike's seat, pegs and bars, and leaning moves the hips and torso. Each bike has a matching rider kit.
 
-The track is a desert motocross course at dusk: layered mesas, Joshua trees, course tape, distance boards, dust from the rear tyre, and a shadow under the bike.
+The track is a desert motocross course: layered mesas, Joshua trees, course tape and windsocks, distance boards, dust from the rear tyre, and a shadow under the bike. Both wheels move on their suspension as you ride: the front slides along the fork, the rear swings with the shock, and you can see them soak up landings and bumps.
 
 ## How the physics works
 
 `js/physics.js` is a small arcade model with no DOM, so it can be tested in Node. The feel knobs live together in `TUNE`.
 
-- The bike pitches about the rear contact patch. Drive force at the tyre lifts the nose and the rear brake pulls it down. Gravity pulls the nose down until the centre of mass passes over the rear axle (the balance point), and past that it pulls the bike over.
-- Air drag acts at the centre of mass, so it cancels out of the pitch balance, as on a real bike. The throttle keeps its bite at top speed. (In the first version, drive faded to nothing near top speed, which made every wheelie uncontrollable after about 20 seconds.)
-- Drive is torque-limited at low speed and power-limited above, and drag is sized so each bike tops out at its real top speed. A steady wheelie therefore has a natural speed for each angle: ride lower to go faster, higher to slow down.
-- An arcade boost on the drive moment stands in for the suspension pop and body weight a real rider uses to get the front up. It eases off towards top speed.
-- Throttle and brake ramp over a fraction of a second, so on/off keys still give fine control: a tap is a small input, a hold is a big one.
-- Heavier, more powerful bikes rotate more slowly per unit of drive. The Varg still pops and loops out fastest, but you have time to catch it.
-- Let your speed bleed below about 5 km/h and the front comes down ("ran out of speed"), so you can't balance at a standstill.
-- The terrain is seeded long rollers plus small bumps. A bump under the rear wheel knocks the nose down, and a bump under the front wheel gives a small pop.
+- The chassis has two degrees of freedom: heave (up and down) and pitch about the rear axle. A rear shock and a front fork hold it up, each a spring with a damper. Rebound is damped harder than compression, like a real shock, so a hit is soaked up instead of springing the bike into the air. At the end of their travel the shock and fork stop hard, with a clunk.
+- Each wheel follows the ground under it, allowing for the tyre's curve, so bumps, logs and rocks push the wheel up through its suspension. Landing on the front loads the fork and the nose bounces; braking hard with both wheels down dives the fork.
+- Drive force at the rear tyre lifts the nose and the brake pulls it down. Gravity pulls the nose down until the centre of mass passes over the rear axle (the balance point), and past that it pulls the bike over. Gravity is felt in the chassis's accelerating frame, so a compression lightens the nose and a drop off a crest makes it heavy.
+- Rear grip depends on the load on the rear tyre and on the surface: dry, wet, mud or a puddle. Ask for more than the tyre can give and it spins.
+- Air drag acts at the centre of mass, so it cancels out of the pitch balance, as on a real bike, and the throttle keeps its bite at top speed. In a wheelie the bike gets an arcade speed boost, which is felt in speed but not in pitch.
+- The pop: snapping into a lean-back on the gas, with the front down or only just up, kicks the nose up. Loading the fork first (leaning forward) makes it bigger.
+- In the air, only the wheels move the bike: gas rotates it nose-up, the brake nose-down.
+- Wind pushes on the rider, high above the centre of mass. A headwind lifts the nose and slows you, a tailwind does the opposite.
+- The police car accelerates to a target speed set from the bike's top speed. The target climbs over time and goes up further when the car falls far behind.
 - It runs at a fixed 240 Hz, so it behaves the same at any frame rate.
 
-The tuning was checked with simulated players that have human limits: 120–280 ms reactions, noisy judgement of the angle, on/off keys. They played every bike over many seeded runs, and the same controller also played the real game in a browser through key presses. With the current values, the Segway, Sur-Ron and Talaria can be held for a minute or more once you get the hang of them. The E Ride and Varg take noticeably more skill.
+The tuning was checked with simulated players that have human limits: 120–280 ms reactions, noisy judgement of the angle, on/off keys. They played every bike over many seeded runs, with the police and in every kind of weather, and the same kind of controller played the real game in a browser through key presses. With the police on, typical runs last somewhere between half a minute and a minute or more, and end in a mix of tyre stacks, loop-outs and busts.
 
 ## Project layout
 
@@ -67,13 +77,14 @@ The tuning was checked with simulated players that have human limits: 120–280 
 index.html        page, HUD and menus
 css/style.css
 js/bikes.js       bike roster, specs and sources
-js/physics.js     wheelie simulation and terrain (no DOM)
+js/physics.js     bike, suspension, terrain, obstacles, weather and police (no DOM)
 js/bikeart.js     traced bike art, wheels, rider and kits (no DOM)
 js/traced/        photo-vectorised bike layers (Sur-Ron)
 tools/            vectorize_bike.py, the photo vectoriser (needs OpenCV)
-js/render.js      canvas drawing: sky, track, dust, gauge
-js/game.js        game loop, input, audio, menus, saved bests
+js/atmosphere.js  time of day, rain, wind, lightning and lighting
+js/render.js      canvas drawing: sky, track, obstacles, police car, gauge
+js/game.js        game loop, input, scoring, HUD, synthesized audio, menus
 tests/            node:test suites for the physics and the art data
 ```
 
-Run the tests with `npm test` (Node 18+). They check that the art's calibration matches the physics (wheelbase and wheel size), that every bike can lift, that pinning the throttle loops out but leaves time to react, that more power makes the bike harder to hold, that a careful keyboard-style rider can hold a wheelie for a minute at real speed on every bike, that the throttle still lifts the nose at top speed, and that the result doesn't depend on frame rate.
+Run the tests with `npm test` (Node 18+). They check that the art's calibration matches the physics (wheelbase and wheel size), that the bike settles on its suspension at rest, that the pop lifts the front quickly and that pinning the throttle loops out but leaves time to react, that the front can come back down and the fork dives under braking, that a hard landing is absorbed, that a careful rider can hold a wheelie for a minute on every bike, that a wheelie is faster than riding on two wheels, that a tyre stack crashes you unless you pop over it, that the police catch a slow rider but not a fast wheelie, that wet ground has less grip and wind pushes the right way, and that the result doesn't depend on frame rate.

@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
   <title>2D2Wheels</title>
-  <meta name="description" content="A 2D wheelie game with five real electric dirt bikes.">
+  <meta name="description" content="A 2D wheelie game with five real electric dirt bikes, obstacles, police chases and changing weather.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Saira+Condensed:wght@500;600;700;800&family=Saira:wght@400;500;600&display=swap">
@@ -15,14 +15,17 @@
 
   <div id="hud" hidden>
     <div class="hud-dist">
-      <div class="hud-label">Score <span id="hud-combo" class="combo"></span></div>
+      <div class="hud-label">Score <span id="hud-mult" class="combo"></span></div>
       <div class="hud-big"><span id="hud-score">0</span></div>
       <div class="best-track" aria-hidden="true"><i id="hud-bestfill"></i></div>
-      <div class="hud-sub"><span id="hud-dist">0.0</span> m · <span class="bolt">⚡</span><span id="hud-cells">0</span> · <span id="hud-best">Best 0</span></div>
+      <div class="hud-sub"><span id="hud-dist">0</span> m · wheelie <span id="hud-wheelie">0</span> m</div>
+      <div class="hud-sub hud-dim" id="hud-best">Best 0</div>
     </div>
     <div class="hud-speed">
       <div class="hud-big"><span id="hud-speed">0</span><small>km/h</small></div>
       <div id="hud-mph" class="hud-sub">0 mph</div>
+      <div id="hud-wind" class="hud-sub hud-wind"><span id="wind-arrow" class="wind-arrow" aria-hidden="true">➜</span> <span id="wind-text">calm</span></div>
+      <div id="hud-cond" class="hud-sub hud-bike"></div>
       <div id="hud-bike" class="hud-sub hud-bike"></div>
     </div>
     <div id="hud-hint" class="hud-hint"></div>
@@ -52,7 +55,7 @@
     <div class="garage">
       <header class="brand">
         <div class="logo" aria-label="2D2Wheels"><span class="logo-a">2D2</span><span class="logo-b">Wheels</span></div>
-        <p class="tag">Pick a bike, get the front up, and ride as far as you can on the back wheel.</p>
+        <p class="tag">Pick a bike, pop the front up and keep it there: over the logs, rocks and tyre stacks, and away from the police.</p>
       </header>
 
       <div class="stage-wrap">
@@ -70,7 +73,11 @@
         <h2 id="bike-name"></h2>
         <p id="bike-blurb" class="blurb"></p>
         <div id="specs" class="specs"></div>
-        <div class="best-row"><span>Your best</span><b id="bike-best">No wheelie yet</b></div>
+        <div class="best-row"><span>Your best</span><b id="bike-best">No run yet</b></div>
+        <div class="conds">
+          <div class="cond"><span class="cond-label" id="lbl-time">Time</span><div class="seg" id="seg-time" role="radiogroup" aria-labelledby="lbl-time"></div></div>
+          <div class="cond"><span class="cond-label" id="lbl-weather">Weather</span><div class="seg" id="seg-weather" role="radiogroup" aria-labelledby="lbl-weather"></div></div>
+        </div>
         <button id="btn-start" class="ride" type="button">Ride <span class="kbd">Enter</span></button>
         <p id="bike-sources" class="sources"></p>
       </div>
@@ -82,7 +89,7 @@
         <span><span class="kbd">↓</span><span class="kbd">S</span> Rear brake</span>
         <span><span class="kbd">←</span><span class="kbd">A</span> Lean back</span>
         <span><span class="kbd">→</span><span class="kbd">D</span> Lean forward</span>
-        <span>Steer the front wheel through ⚡ cells to build a combo. Sit just under the balance point for double points.</span>
+        <span>Snap back on the gas to pop the front over obstacles. Wheelie to outrun the police: you're faster on one wheel. Sit just under the balance point for double points.</span>
         <span class="fine">Specs from manufacturer and retailer listings; physics simplified. A fan game, not affiliated with these brands.</span>
       </footer>
     </div>
@@ -90,12 +97,13 @@
 
   <section id="results" class="overlay" hidden>
     <div class="slip">
-      <div class="slip-head"><span id="res-title">Front wheel down</span><span id="res-bike"></span></div>
+      <div class="slip-head"><span id="res-title">Busted</span><span id="res-bike"></span></div>
       <div class="res-dist"><span id="res-dist">0</span><small>pts</small></div>
       <div id="res-best" class="res-best"></div>
       <dl class="res-stats">
-        <div><dt>On the back wheel</dt><dd id="res-time">0.0 m</dd></div>
-        <div><dt>Charge cells</dt><dd id="res-cells">0</dd></div>
+        <div><dt>Distance</dt><dd id="res-dist-m">0 m · 0 s</dd></div>
+        <div><dt>On the back wheel</dt><dd id="res-wheelie">0 m</dd></div>
+        <div><dt>Obstacles cleared</dt><dd id="res-clears">0</dd></div>
         <div><dt>Top speed</dt><dd id="res-speed">0 km/h</dd></div>
       </dl>
       <div class="slip-actions">
@@ -109,6 +117,7 @@
   <script src="js/physics.js"></script>
   <script src="js/traced/surron-lbx.js"></script>
   <script src="js/bikeart.js"></script>
+  <script src="js/atmosphere.js"></script>
   <script src="js/render.js"></script>
   <script src="js/game.js"></script>
 </body>
