@@ -77,6 +77,8 @@
         <div class="conds">
           <div class="cond"><span class="cond-label" id="lbl-time">Time</span><div class="seg" id="seg-time" role="radiogroup" aria-labelledby="lbl-time"></div></div>
           <div class="cond"><span class="cond-label" id="lbl-weather">Weather</span><div class="seg" id="seg-weather" role="radiogroup" aria-labelledby="lbl-weather"></div></div>
+          <div class="cond"><span class="cond-label" id="lbl-wanted">Wanted</span><div class="seg seg-stars" id="seg-wanted" role="radiogroup" aria-labelledby="lbl-wanted"></div></div>
+          <p class="wanted-desc" id="wanted-desc"></p>
         </div>
         <button id="btn-start" class="ride" type="button">Ride <span class="kbd">Enter</span></button>
         <p id="bike-sources" class="sources"></p>
@@ -105,6 +107,7 @@
         <div><dt>On the back wheel</dt><dd id="res-wheelie">0 m</dd></div>
         <div><dt>Obstacles cleared</dt><dd id="res-clears">0</dd></div>
         <div><dt>Top speed</dt><dd id="res-speed">0 km/h</dd></div>
+        <div><dt>Points to spend</dt><dd id="res-bank">0</dd></div>
       </dl>
       <div class="slip-actions">
         <button id="btn-retry" class="ride" type="button">Again <span class="kbd">R</span></button>
@@ -116,6 +119,7 @@
   <script src="js/bikes.js"></script>
   <script src="js/physics.js"></script>
   <script src="js/traced/surron-lbx.js"></script>
+  <script src="js/traced/stark-varg-mx.js"></script>
   <script src="js/bikeart.js"></script>
   <script src="js/atmosphere.js"></script>
   <script src="js/render.js"></script>

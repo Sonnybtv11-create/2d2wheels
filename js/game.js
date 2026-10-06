@@ -39,6 +39,15 @@
     { id: 'rain', label: 'Rain' },
     { id: 'storm', label: 'Storm' },
   ];
+  const WANTED_INFO = [
+    null,
+    'Slow cruiser that sets off late · ×1 points',
+    'The standard chase · ×1.5 points',
+    'Faster, and they lay stingers: wheelie over them · ×2 points',
+    'Helicopter overhead, so they never fall far behind · ×3 points',
+    'Interceptor, the lot · ×4 points',
+  ];
+  let condWanted = clamp(store.get('wanted', 2) | 0, 1, 5);
   let condTime = store.get('time', 'sunset');
   let condWeather = store.get('weather', 'random');
   if (!TIMES.some((t) => t.id === condTime)) condTime = 'sunset';
@@ -66,6 +75,8 @@
   let clock = 0;
   let hl = 0, hlOn = false, hlT = 0; // headlight
   let runsThisSession = 0;
+  let heli = null;      // the four- and five-star helicopter
+  let wantedMult = 1;
   const demo = { up: true, t: 0 };
   const keys = { throttle: false, brake: false, leanBack: false, leanFwd: false };
 
@@ -121,15 +132,20 @@
       btn.type = 'button';
       btn.setAttribute('role', 'radio');
       btn.textContent = o.label;
+      btn.setAttribute('aria-label', typeof o.id === 'number' ? `${o.id} star${o.id > 1 ? 's' : ''}` : o.label);
       btn.addEventListener('click', () => { set(o.id); refreshSeg(); newRun(false); });
       btn.dataset.id = o.id;
       el.appendChild(btn);
     }
-    const refreshSeg = () => [...el.children].forEach((b) => b.setAttribute('aria-checked', String(b.dataset.id === get())));
+    const refreshSeg = () => [...el.children].forEach((b) => b.setAttribute('aria-checked', String(b.dataset.id === String(get()))));
     refreshSeg();
   }
   buildSeg($('seg-time'), TIMES, () => condTime, (id) => { condTime = id; store.set('time', id); });
   buildSeg($('seg-weather'), WEATHERS, () => condWeather, (id) => { condWeather = id; store.set('weather', id); });
+  buildSeg($('seg-wanted'), [1, 2, 3, 4, 5].map((n) => ({ id: n, label: '★'.repeat(n) })), () => condWanted, (id) => {
+    condWanted = id; store.set('wanted', id); $('wanted-desc').textContent = WANTED_INFO[id];
+  });
+  $('wanted-desc').textContent = WANTED_INFO[condWanted];
 
   const SPEC_MAX = { power: Math.log(80), weight: 130, speed: 150 };
   function specRow(label, value, frac) {
@@ -250,7 +266,9 @@
     terrain.env = Sim.createWeather(seed, weatherKind);
     timeOf = TIMES.find((t) => t.id === condTime);
     fx = Atmo.createFx(seed);
-    sim = Sim.createState({ police: !!play });
+    sim = Sim.createState({ police: !!play, wanted: condWanted, seed });
+    wantedMult = play ? Sim.WANTED[condWanted].mult : 1;
+    heli = play && Sim.WANTED[condWanted].heli ? { x: -30, y: 12, vx: 0, on: false } : null;
     rider = null;
     crashPose = null;
     particles = [];
@@ -285,14 +303,17 @@
     const isBest = run.score > prev;
     if (isBest) store.set('hi.' + bike.id, Math.round(run.score));
     if (sim.distance > bestDist(bike.id)) store.set('far.' + bike.id, Math.round(sim.distance));
+    const bank = store.get('bank', 0) + Math.round(run.score);
+    store.set('bank', bank);
     $('res-title').textContent = sim.cause || 'Crashed';
     $('res-title').className = 'crash';
-    $('res-bike').textContent = `${bike.name} · ${weatherLabel()}`;
+    $('res-bike').textContent = `${bike.name} · ${weatherLabel()} · ${'★'.repeat(condWanted)}`;
     $('res-dist').textContent = fmt(run.score);
     $('res-dist-m').textContent = `${fmt(sim.distance)} m · ${stats.endT.toFixed(0)} s`;
     $('res-wheelie').textContent = `${fmt(sim.wheelieTotal)} m · longest ${fmt(sim.longest)} m`;
     $('res-clears').textContent = String(stats.clears) + (stats.closeCalls ? ` · ${stats.closeCalls} close call${stats.closeCalls > 1 ? 's' : ''}` : '');
     $('res-speed').textContent = `${Math.round(stats.topSpeed * 3.6)} km/h`;
+    $('res-bank').textContent = `${fmt(bank)} (+${fmt(run.score)})`;
     const rb = $('res-best');
     rb.textContent = isBest ? (prev > 0 ? `New best, up from ${fmt(prev)}` : 'New best') : `Best ${fmt(prev)}`;
     rb.className = 'res-best' + (isBest ? ' new' : '');
@@ -372,7 +393,7 @@
   /* ---------- audio: all synthesized ---------- */
   const audio = (() => {
     let ac = null, out, osc, osc2, gain, filter, roarGain, noiseBuf;
-    let rainGain, windGain, windFilter, sirenOsc, sirenGain;
+    let rainGain, windGain, windFilter, sirenOsc, sirenGain, rotorGain;
     let muted = store.get('muted', false);
     const label = () => { $('snd-on').style.display = muted ? 'none' : ''; $('snd-off').style.display = muted ? '' : 'none'; };
     label();
@@ -440,6 +461,14 @@
         sirenGain = ac.createGain(); sirenGain.gain.value = 0;
         sirenOsc.connect(sf); sf.connect(sirenGain); sirenGain.connect(out);
         osc.start(); osc2.start(); roar.start(); rain.start(); wind.start(); sirenOsc.start();
+        const rotor = noise(), rf2 = ac.createBiquadFilter(); rf2.type = 'lowpass'; rf2.frequency.value = 160;
+        const chop = ac.createGain(); chop.gain.value = 0.5;
+        const lfo = ac.createOscillator(); lfo.frequency.value = 11; lfo.type = 'square';
+        const depth = ac.createGain(); depth.gain.value = 0.5;
+        lfo.connect(depth); depth.connect(chop.gain);
+        rotorGain = ac.createGain(); rotorGain.gain.value = 0;
+        rotor.connect(rf2); rf2.connect(chop); chop.connect(rotorGain); rotorGain.connect(out);
+        rotor.start(); lfo.start();
       },
       update(s, h, a, now) {
         if (!ac) return;
@@ -467,6 +496,9 @@
           if (mode === 'results') sv *= 0.5;
         }
         sirenGain.gain.setTargetAtTime(sv, t, 0.15);
+        // helicopter rotor: low noise chopped at the blade rate
+        const hv = heli && heli.on && !muted && mode !== 'menu' ? 0.09 : 0;
+        rotorGain.gain.setTargetAtTime(hv, t, 0.4);
       },
       thud(k) { hit('lowpass', 220, clamp(0.12 + k * 0.06, 0, 0.4), 0.22); tone('sine', 120, 45, clamp(0.1 + k * 0.05, 0, 0.3), 0.2); },
       clunk(k) { tone('square', 70, 40, clamp(0.04 + k * 0.02, 0, 0.1), 0.09); hit('bandpass', 900, 0.05, 0.06, 2); },
@@ -481,6 +513,8 @@
         hit('lowpass', 90, 0.3 * k, 3.4, 0.9, 0.25);
         hit('bandpass', 400, 0.08 * k, 0.6, 0.6);
       },
+      // the stinger warning: a two-tone radio chirp
+      alert() { tone('square', 1400, 1400, 0.035, 0.09); tone('square', 1000, 1000, 0.035, 0.09, 0.11); },
       busted() { tone('square', 600, 1300, 0.05, 0.35); tone('square', 1300, 600, 0.05, 0.35, 0.36); },
       // short two-note chime for milestones
       chime(high) {
@@ -510,7 +544,7 @@
   // A point per metre on two wheels, two on the back wheel, four in the sweet
   // spot just under the balance point. Clearing obstacles with the front up
   // scores a bonus, and so does shaking off the police from close range.
-  const CLEAR_POINTS = { log: 40, rock: 30, tyres: 100 };
+  const CLEAR_POINTS = { log: 40, rock: 30, tyres: 100, stinger: 120 };
 
   function popup(text, x, y, color, big) {
     run.popups.push({ text, x, y, color, big, age: 0, life: 1.1 });
@@ -523,7 +557,7 @@
     const bal = Sim.balanceAngle(sim, handling);
     run.sweet = sim.inWheelie && sim.theta > bal - 7 * DEG && sim.theta < bal + 2 * DEG;
     run.mult = sim.inWheelie ? (run.sweet ? 4 : 2) : 1;
-    run.score += Math.max(0, sim.x - run.lastX) * run.mult;
+    run.score += Math.max(0, sim.x - run.lastX) * run.mult * wantedMult;
     run.lastX = sim.x;
 
     // close calls: let the police get right on your tail, then pull away
@@ -532,9 +566,9 @@
       if (p.gap < 5) run.danger = true;
       else if (run.danger && p.gap > 22) {
         run.danger = false;
-        run.score += 150;
+        run.score += 150 * wantedMult;
         stats.closeCalls++;
-        popup('Close call +150', sim.x + 0.4, terrain.base(sim.x) + 2.4, 'rgba(255,197,49,A)', true);
+        popup(`Close call +${Math.round(150 * wantedMult)}`, sim.x + 0.4, terrain.base(sim.x) + 2.4, 'rgba(255,197,49,A)', true);
         audio.clear(true);
       }
     }
@@ -551,7 +585,11 @@
         if (e.end === 'rear') for (let i = 0; i < 6; i++) dustAt(sim.x, 1);
       } else if (e.type === 'impact') {
         const o = e.obstacle;
-        if (sim.status === 'crashed' && o.tall) {
+        if (o.type === 'stinger') {
+          shake = 0.6;
+          audio.thud(2);
+          sparks(o.x, terrain.surface(o.x) + 0.1, 10);
+        } else if (sim.status === 'crashed' && o.tall) {
           shake = 0.7;
           scatter(o, e.v || sim.v);
           audio.tyre();
@@ -564,18 +602,20 @@
       } else if (e.type === 'cone') {
         knockCone(e.obstacle, e.v);
         if (mode === 'play') {
-          run.score += 10;
-          popup('+10', e.obstacle.x, terrain.surface(e.obstacle.x) + 0.7, 'rgba(255,150,90,A)');
+          run.score += 10 * wantedMult;
+          popup(`+${Math.round(10 * wantedMult)}`, e.obstacle.x, terrain.surface(e.obstacle.x) + 0.7, 'rgba(255,150,90,A)');
         }
       } else if (e.type === 'clear') {
         const o = e.obstacle;
         if (mode === 'play') {
-          const pts = (CLEAR_POINTS[o.type] || 20) * (sim.inWheelie ? 1 : 0.5);
+          const pts = (CLEAR_POINTS[o.type] || 20) * (sim.inWheelie ? 1 : 0.5) * wantedMult;
           run.score += pts;
           stats.clears++;
           popup(`+${Math.round(pts)}`, o.x, terrain.surface(o.x) + o.h + 0.6, o.tall ? 'rgba(255,197,49,A)' : 'rgba(240,235,225,A)', o.tall);
           audio.clear(o.tall);
         }
+      } else if (e.type === 'stinger') {
+        if (mode === 'play') { hint('Stinger ahead · front wheel up!', 1.6, true); audio.alert(); }
       } else if (e.type === 'touchdown') {
         const fx0 = sim.x + handling.wheelbase;
         for (let i = 0; i < 10; i++) dustAt(fx0, 1.2);
@@ -918,10 +958,13 @@
     const horizon = groundLine - scale * 0.4;
 
     R.drawSky(ctx, W, H, camX, horizon, a, clock);
+    // the cruisers that laid the stingers, parked beyond the tape
+    for (const st of sim.stingers) R.drawPolice(ctx, view, terrain, { x: st.x + 2.5, active: true }, clock + st.x, { parked: { s: 0.62, lift: 0.75, alpha: 0.9 } });
     R.drawTrackside(ctx, view, terrain, a.wind, clock);
     R.drawGround(ctx, view, terrain, a, a.wind, clock);
     R.drawFeatures(ctx, view, terrain, a, clock);
     R.drawObstacles(ctx, view, terrain, gone, a);
+    for (const st of sim.stingers) R.drawStinger(ctx, view, terrain, st, sim.time);
 
     if (mode !== 'menu') {
       const bd = bestDist(bike.id);
@@ -930,7 +973,7 @@
 
     // the police car
     let pol = null;
-    if (p) pol = R.drawPolice(ctx, view, terrain, p, clock);
+    if (p) pol = R.drawPolice(ctx, view, terrain, p, clock, { interceptor: p.cfg.interceptor });
 
     // bike
     const pose = bikePose();
@@ -960,8 +1003,29 @@
     R.drawParticles(ctx, view, particles.filter((q) => !(q.r >= 0.05 && !q.spark && q.y < terrain.height(q.x) + 0.6)));
     if (run && mode !== 'menu') R.drawPopups(ctx, view, run.popups);
 
+    // the helicopter: arrives with the chase and hangs just ahead of you
+    let heliLamp = null;
+    if (heli) {
+      if (p && p.active) heli.on = true;
+      const tx = sim.x + 3 + 2.5 * Math.sin(clock * 0.23), ty = terrain.base(tx) + 3.9 + 0.3 * Math.sin(clock * 0.7);
+      if (!heli.on) { heli.x = sim.x - 45; heli.y = ty + 3; }
+      const chaseV = (sim.status === 'riding' ? sim.v : 0) + clamp((tx - heli.x) * 0.9, -12, 25);
+      heli.vx += (chaseV - heli.vx) * Math.min(1, dt * 1.5);
+      heli.x += heli.vx * dt;
+      heli.y += (ty - heli.y) * Math.min(1, dt * 0.8);
+      const tilt = clamp((heli.vx - sim.v) * 0.02, -0.15, 0.28);
+      heliLamp = R.drawHeli(ctx, view, heli.x, heli.y, tilt, clock);
+      // downwash kicks up dust under it
+      if (heli.on && Math.random() < dt * 20) dustAt(heli.x + (Math.random() - 0.5) * 4, 1.4);
+    }
+
     // lighting: darkness with the lamps cut out of it
     const lights = [];
+    if (heliLamp) {
+      const [bx, by] = toScreen(pose.wx, pose.wy + 0.6);
+      const dist = Math.hypot(bx - heliLamp[0], by - heliLamp[1]);
+      lights.push({ kind: 'cone', x: heliLamp[0], y: heliLamp[1], angle: Math.atan2(by - heliLamp[1], bx - heliLamp[0]), spread: 0.12, len: dist * 1.3, power: 0.9, color: '225,235,255' });
+    }
     if (hl > 0.01) {
       const L = Art.info(bike.id).light;
       const [lx, ly] = poseToWorld(pose, L[0], L[1]);
@@ -980,6 +1044,19 @@
       lights.push({ kind: 'point', x: pol.bar[0], y: pol.bar[1], r: 3.2 * scale, power: p.active ? 0.95 : 0, color: pol.red ? '255,40,40' : '50,110,255', glow: 0.55 });
     }
     Atmo.drawLighting(ctx, a, lights, W, H, DPR, horizon, fx.flash);
+    if (heliLamp && a.light > 0.5) {
+      // by day the searchlight is just a faint shaft
+      const L = lights[0];
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.fillStyle = 'rgba(255,255,240,0.06)';
+      ctx.beginPath();
+      ctx.moveTo(L.x, L.y);
+      ctx.arc(L.x, L.y, L.len, L.angle - L.spread * 0.7, L.angle + L.spread * 0.7);
+      ctx.closePath();
+      ctx.fill();
+      ctx.restore();
+    }
 
     // weather in front of everything
     const groundAt = (xs) => toScreenY(terrain.surface(view.camX + xs / scale));
@@ -1037,7 +1114,9 @@
     const { scale, camX, toScreenY } = view;
     const edge = camX + W / scale;
     const reach = edge + Math.max(8, sim.v * 2.2);
-    const o = terrain.obstaclesNear(edge - 0.3, reach).find((q) => !q.soft && !gone.has(q));
+    const ob = terrain.obstaclesNear(edge - 0.3, reach).find((q) => !q.soft && !gone.has(q));
+    const sg = sim.stingers.find((q) => !q.hit && q.x > edge - 0.3 && q.x < reach);
+    const o = sg && (!ob || sg.x < ob.x) ? { type: 'stinger', x: sg.x, tall: true } : ob;
     if (o) {
       const d = o.x - (sim.x + handling.wheelbase);
       const k = clamp((reach - o.x) / (reach - edge), 0, 1);
@@ -1055,7 +1134,7 @@
       ctx.font = `800 13px ${R.FONT}`;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      ctx.fillText(o.tall ? '!' : o.type === 'log' ? 'LOG' : 'ROCK', -4, 1);
+      ctx.fillText(o.type === 'stinger' ? 'SPIKE' : o.tall ? '!' : o.type === 'log' ? 'LOG' : 'ROCK', -4, 1);
       ctx.fillStyle = o.tall ? '#ff8a8a' : 'rgba(246,239,229,0.9)';
       ctx.font = `700 12px ${R.FONT}`;
       ctx.fillText(`${Math.round(d)} m`, -2, 27);
@@ -1107,6 +1186,15 @@
         ctx.fillRect(X - 1.5, y - 5, 3, 10);
       }
     }
+    for (const st of sim.stingers) {
+      if (st.x < sim.x - RADAR_BACK || st.x > sim.x + RADAR_AHEAD) continue;
+      const X = toX(st.x - sim.x);
+      ctx.strokeStyle = st.hit ? 'rgba(255,150,40,0.35)' : '#ff9a2a';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      for (let i = 0; i <= 4; i++) ctx.lineTo(X - 6 + i * 3, y + (i % 2 ? -5 : 3));
+      ctx.stroke();
+    }
     // you
     const bx = toX(0);
     ctx.fillStyle = '#ffc531';
@@ -1129,6 +1217,14 @@
       ctx.fillStyle = gap < 15 && p.active ? '#ff6a6a' : 'rgba(246,239,229,0.85)';
       const label = p.active ? `POLICE ${Math.round(gap)} m` : 'POLICE';
       ctx.fillText(label, Math.min(Math.max(x0, X - 20), x0 + w - 90), y + 25);
+      // wanted level
+      ctx.textAlign = 'right';
+      ctx.font = `700 13px ${R.FONT}`;
+      const lit = '★'.repeat(p.level), dim = '★'.repeat(5 - p.level);
+      ctx.fillStyle = 'rgba(246,239,229,0.25)';
+      ctx.fillText(dim, x0 + w + 4, y + 26);
+      ctx.fillStyle = '#ffc531';
+      ctx.fillText(lit, x0 + w + 4 - ctx.measureText(dim).width, y + 26);
     }
     ctx.restore();
   }
@@ -1167,7 +1263,8 @@
       dist: sim.wheelieDist, time: sim.time, inWheelie: sim.inWheelie, frontDown: sim.frontDown, airborne: sim.airborne,
       cr: sim.cr, cf: sim.cf, popT: sim.popT, x: sim.x, distance: sim.distance, inPuddle: sim.inPuddle, inMud: sim.inMud,
       score: run ? run.score : 0, clears: stats ? stats.clears : 0,
-      police: sim.police && { gap: sim.police.gap, active: sim.police.active, v: sim.police.v },
+      police: sim.police && { gap: sim.police.gap, active: sim.police.active, v: sim.police.v, level: sim.police.level },
+      stingers: sim.stingers.filter((q) => !q.hit).map((q) => q.x),
       ahead: terrain.obstaclesNear(sim.x + handling.wheelbase, sim.x + handling.wheelbase + 30).filter((o) => !gone.has(o)).map((o) => ({ type: o.type, x: o.x, h: o.h, tall: o.tall })),
       frontX: sim.x + handling.wheelbase * Math.cos(sim.theta),
       weather: weatherKind, tod: atmo && atmo.tod, light: atmo && atmo.light, headlight: hl,

@@ -7,11 +7,8 @@
  *
  * Reference photos:
  *   Stark Varg MX     - elmox.de product image (red), facing right
- *   Segway X260       - segway.la product image (silver), facing right
  *   Sur-Ron LBX       - radmotousa.com product image (green), mirrored and
  *                       vectorised into colour layers (js/traced/surron-lbx.js)
- *   Talaria MX4       - talariacanada.com product image (blue), facing right
- *   E Ride Pro-SS     - chargedcycleworks.com product image (black), near side-on
  */
 (function (root) {
   'use strict';
@@ -31,74 +28,32 @@
         dark: '#202125', battery: '#2b2d31', rim: '#1d1e21', spoke: '#c4c7cc', accent: '#ffffff',
         forkUp: '#b8935a', forkLow: '#18191b', spring: '#e8e9eb', shockBody: '#2a2b2f', chain: '#8c8f94', sprocket: '#3a3c40',
       },
+      traced: 'stark-varg-mx',
       sprocket: 34, drive: [287, 404], driveR: 9,
-      parts: [
-        { k: 'line', p: [[240, 362], [236, 418]], w: 9, c: 'frame' },
-        { k: 'chain' },
-        { k: 'poly', c: 'metal', p: [[128, 436], [268, 386], [292, 398], [292, 420], [140, 464], [124, 454]], gloss: 1 },
-        { k: 'line', p: [[150, 446], [270, 404]], w: 3, c: '#9da1a7' },
-        { k: 'circle', at: [287, 404], r: 11, c: 'dark' },
-        { k: 'shock', a: [272, 402], b: [258, 340], w: 13 },
-        { k: 'poly', c: 'battery', p: [[296, 305], [416, 318], [420, 345], [412, 420], [393, 441], [300, 442], [286, 424], [289, 330]] },
-        { k: 'fins', clip: [[332, 312], [414, 322], [412, 418], [370, 432], [340, 432]], c: '#1a1b1e', dir: 'h', gap: 7 },
-        { k: 'poly', c: 'dark', p: [[288, 424], [400, 424], [408, 438], [392, 448], [300, 448]] },
-        { k: 'poly', c: 'metal', p: [[298, 352], [340, 342], [362, 360], [366, 412], [346, 430], [306, 430], [294, 408]], smooth: 1, gloss: 1 },
-        { k: 'ring', at: [330, 387], r: 22, w: 3, c: '#9aa0a6' },
-        { k: 'circle', at: [330, 387], r: 7, c: '#7d8187' },
-        { k: 'poly', c: 'frame', p: [[398, 236], [420, 214], [446, 210], [462, 248], [452, 300], [430, 300], [420, 260]] },
-        { k: 'poly', c: 'body', p: [[52, 250], [110, 254], [160, 262], [205, 274], [245, 286], [278, 298], [276, 330], [264, 362], [248, 372], [232, 354], [212, 330], [188, 304], [160, 283], [120, 267], [80, 257]], smooth: 1, gloss: 1 },
-        { k: 'poly', c: 'body', p: [[272, 270], [330, 252], [395, 233], [440, 226], [459, 250], [453, 282], [441, 312], [428, 343], [416, 328], [406, 306], [380, 302], [330, 302], [284, 302]], smooth: 1, gloss: 1 },
-        { k: 'poly', c: 'body2', p: [[300, 300], [404, 302], [416, 326], [428, 343], [418, 344], [404, 318], [300, 310]] },
-        { k: 'poly', c: 'seat', p: [[134, 255], [200, 260], [262, 262], [304, 256], [350, 243], [398, 226], [408, 231], [398, 242], [352, 258], [302, 270], [240, 274], [188, 270], [150, 264]], smooth: 1, gloss: 0.5 },
-        { k: 'line', p: [[150, 262], [300, 262]], w: 1.5, c: '#3a3b40' },
-        { k: 'fender', p: [[470, 258], [520, 260], [566, 268], [612, 286], [602, 290], [560, 283], [515, 280], [470, 279]], c: 'body' },
-        { k: 'fork', top: [450, 196], axle: [556, 445], split: 0.52, wUp: 19, wLow: 16 },
-        { k: 'poly', c: 'frame', p: [[436, 196], [470, 190], [474, 206], [440, 212]] },
-        { k: 'poly', c: 'frame', p: [[446, 246], [486, 240], [488, 256], [450, 262]] },
-        { k: 'poly', c: '#f2f3f5', p: [[440, 212], [460, 202], [484, 246], [478, 262], [458, 262]], gloss: 0.6, alpha: 0.9 },
-        { k: 'bars', clamp: [452, 194], grip: [410, 186], c: 'frame' },
-      ],
-      rider: { hip: [290, 246], peg: [284, 426], grip: [410, 186] },
-      light: [470, 228], // the MX bike has no lamp; a bar-mounted light for night runs
-      kit: { jersey: '#d4111c', jersey2: '#ffffff', pants: '#1f2024', pants2: '#d4111c', helmet: '#f4f4f4', helmet2: '#d4111c', visor: '#1b1c20', lens: '#ff8a3d', boots: '#f2f2f2', gloves: '#1f2024' },
-    },
-
-    'segway-x260': {
-      ref: { rear: [122, 424], front: [565, 424], wheelbase: 1.27, tyre: 105 },
-      pal: {
-        body: '#d5d8dc', body2: '#9ea3aa', seat: '#1e1f22', frame: '#d5d8dc', metal: '#b9bdc3',
-        dark: '#1b1c1f', battery: '#2a2c30', rim: '#1d1e21', spoke: '#c4c7cc', accent: '#e1251b',
-        forkUp: '#1d1e21', forkLow: '#26272b', spring: '#e1251b', shockBody: '#2a2b2f', chain: '#7d8086', sprocket: '#3a3c40',
+      style: {
+        rim: '#1a1b1e', spoke: '#c4c7cc', hub: '#c9ccd1', sprocket: '#7d8187', chain: '#8c8f94',
+        tyre: { tread: 'mx' }, disc: { style: 'wave' }, caliper: { c: '#2b2d31', pistons: 2 },
+        fork: { upper: '#b8935a', stanchion: '#4a3f2c', guard: '#18191b', clamp: '#2a2b2f' },
+        shock: { spring: '#26272b', body: '#b9bdc3', collar: '#3b3d42' },
+        motor: { cover: '#c9ccd1', hub: '#9ea2a8' },
+        battery: {},
+        light: { type: 'none' },
+        bars: { c: '#1c1d20' },
       },
-      sprocket: 30, drive: [330, 410], driveR: 11,
       parts: [
         { k: 'chain' },
-        { k: 'poly', c: 'dark', p: [[108, 376], [238, 364], [300, 350], [346, 372], [332, 396], [272, 406], [142, 436], [110, 426]], gloss: 0.4 },
-        { k: 'line', p: [[150, 392], [290, 372]], w: 3, c: 'accent' },
-        { k: 'poly', c: 'dark', p: [[178, 298], [196, 312], [216, 336], [230, 362], [219, 364], [202, 338], [182, 314]], smooth: 1 },
-        { k: 'shock', a: [292, 352], b: [342, 292], w: 13 },
-        { k: 'poly', c: 'dark', p: [[200, 250], [262, 262], [332, 256], [348, 276], [332, 302], [300, 302], [258, 282]] },
-        { k: 'rect', at: [242, 262], w: 7, h: 13, c: 'accent' },
-        { k: 'poly', c: 'frame', p: [[454, 196], [472, 212], [456, 246], [432, 302], [416, 384], [396, 406], [340, 412], [298, 400], [296, 366], [316, 300], [330, 260], [400, 226]], gloss: 1 },
-        { k: 'poly', c: 'battery', p: [[350, 284], [444, 244], [424, 300], [406, 380], [342, 382], [336, 330]] },
-        { k: 'grid', clip: [[354, 290], [436, 254], [418, 302], [402, 374], [348, 376], [342, 332]], c: '#1c1d20', gap: 6 },
-        { k: 'poly', c: 'accent', p: [[408, 300], [418, 296], [404, 372], [394, 374]] },
-        { k: 'circle', at: [330, 410], r: 32, c: 'dark' },
-        { k: 'ring', at: [330, 410], r: 22, w: 3, c: '#5a5d63' },
-        { k: 'circle', at: [330, 410], r: 8, c: '#8b8f95' },
-        { k: 'poly', c: 'seat', p: [[130, 218], [175, 224], [230, 232], [290, 236], [328, 238], [333, 249], [300, 256], [250, 258], [200, 248], [150, 226]], smooth: 1, gloss: 0.5 },
-        { k: 'poly', c: 'dark', p: [[332, 240], [372, 232], [406, 228], [410, 244], [370, 250], [334, 252]] },
-        { k: 'rect', at: [384, 236], w: 10, h: 6, c: 'accent' },
-        { k: 'fender', p: [[456, 226], [492, 220], [540, 220], [592, 232], [600, 236], [560, 237], [500, 234], [470, 241]], c: 'dark' },
-        { k: 'fork', top: [456, 182], axle: [565, 424], split: 0.55, wUp: 18, wLow: 16 },
-        { k: 'poly', c: 'dark', p: [[440, 250], [462, 244], [456, 280], [436, 320], [428, 316]] },
-        { k: 'poly', c: 'dark', p: [[444, 178], [476, 172], [482, 196], [450, 200]] },
-        { k: 'circle', at: [470, 182], r: 10, c: '#e9eef5' },
-        { k: 'bars', clamp: [452, 172], grip: [416, 160], c: 'dark' },
+        { k: 'shock', a: [272, 402], b: [258, 340], w: 13 },
+        { k: 'traced' },
+        { k: 'battery', clip: [[340, 316], [414, 321], [418, 348], [410, 420], [392, 440], [340, 440]], badge: [384, 334] },
+        { k: 'motor', at: [316, 386], r: 36, shape: 'oval' },
+        { k: 'fork', top: [432, 196], axle: [556, 445], split: 0.58, guard: 0.4, lower: 0.24, wUp: 18, wLow: 15 },
+        { k: 'plate', p: [[440, 203], [462, 200], [494, 244], [472, 252], [452, 242]] },
+        { k: 'lamp', at: [474, 224], angle: -0.15, mount: [446, 214] },
+        { k: 'bars', clamp: [434, 194], grip: [388, 190], c: 'frame' },
       ],
-      rider: { hip: [256, 232], peg: [295, 404], grip: [416, 160] },
-      light: [478, 182],
-      kit: { jersey: '#dfe2e6', jersey2: '#e1251b', pants: '#2d3036', pants2: '#e1251b', helmet: '#c9ccd1', helmet2: '#2d3036', visor: '#1e2024', lens: '#7fd3ff', boots: '#dfe2e6', gloves: '#2d3036' },
+      rider: { hip: [290, 246], peg: [284, 426], grip: [392, 189] },
+      light: [486, 222], // the MX bike has no lamp; a light kit fits on the plate
+      kit: { jersey: '#d4111c', jersey2: '#ffffff', pants: '#1f2024', pants2: '#d4111c', helmet: '#f4f4f4', helmet2: '#d4111c', visor: '#1b1c20', lens: '#ff8a3d', boots: '#f2f2f2', gloves: '#1f2024' },
     },
 
     'surron-lbx': {
@@ -112,95 +67,33 @@
         dark: '#1b1c1f', metal: '#b9bdc3', body: '#7a8032', accent: '#e5db48',
       },
       sprocket: 92, drive: [766, 810], driveR: 22,
+      style: {
+        rim: '#1a1b1e', spoke: '#c4c7cc', hub: '#9ca0a6', sprocket: '#c2a46a', chain: '#b08d52',
+        tyre: { tread: 'mx' }, disc: { style: 'wave' }, caliper: { c: '#2b2d31', pistons: 4 },
+        fork: { upper: '#c69f6c', stanchion: '#d7dade', guard: '#1c1d20', clamp: '#2a2b2f', decal: '#e5db48' },
+        shock: { spring: '#d9d9d4', body: '#2a2b2f', reservoir: '#b87333', collar: '#b87333' },
+        motor: { cover: '#141517', ring: '#e5db48', dash: true },
+        battery: {},
+        light: { type: 'stock' },
+        bars: { c: '#1b1c1f' },
+      },
       parts: [
         { k: 'chain' },
         { k: 'poly', c: '#6c7230', p: [[250, 860], [300, 838], [420, 778], [540, 712], [600, 690], [660, 700], [690, 760], [660, 800], [560, 830], [420, 862], [300, 900], [258, 898]], smooth: 0.5 },
-        { k: 'line', p: [[1192, 612], [1334, 868]], w: 42, c: 'forkLow', end: 'front' },
-        { k: 'line', p: [[1180, 622], [1316, 862]], w: 6, c: 'rgba(255,255,255,0.16)', move: 'front' },
-        { k: 'line', p: [[1286, 772], [1304, 806]], w: 16, c: 'accent', move: 'front' },
-        { k: 'circle', at: [1334, 868], r: 24, c: 'forkLow', move: 'front' },
+        { k: 'shock', a: [646, 694], b: [714, 530], w: 40 },
         { k: 'traced' },
+        { k: 'controller', at: [560, 470], w: 90, h: 40, angle: -0.35 },
+        { k: 'battery', badge: [842, 400] },
+        { k: 'motor', at: [768, 806], r: 64 },
+        { k: 'fork', top: [1050, 300], axle: [1334, 868], split: 0.61, guard: 0.34, lower: 0.18, wUp: 46, wLow: 40 },
+        { k: 'lamp', at: [1132, 292], s: 1.25, mount: [1066, 300] },
+        { k: 'bars', clamp: [1072, 262], grip: [1004, 228], c: 'dark' },
       ],
       rider: { hip: [590, 392], peg: [655, 855], grip: [1000, 228] },
-      light: [1100, 272],
+      light: [1182, 292],
       kit: { jersey: '#f2f2ee', jersey2: '#8a9a2e', pants: '#4a4f57', pants2: '#c9d36a', helmet: '#f2f2ee', helmet2: '#8a9a2e', visor: '#1d1e21', lens: '#ffd34d', boots: '#f2f2ee', gloves: '#1d1e21' },
     },
 
-    'talaria-mx4': {
-      ref: { rear: [100, 385], front: [490, 385], wheelbase: 1.29, tyre: 94 },
-      pal: {
-        body: '#1f62e0', body2: '#123c8f', seat: '#1b1c1f', frame: '#1d1e22', metal: '#b9bdc3',
-        dark: '#1b1c1f', battery: '#202125', rim: '#1a1b1e', spoke: '#c4c7cc', accent: '#ffffff',
-        forkUp: '#1b1c1f', forkLow: '#232428', spring: '#1f62e0', shockBody: '#2a2b2f', chain: '#a88a4a', sprocket: '#3a3c40',
-      },
-      sprocket: 30, drive: [290, 355], driveR: 10,
-      parts: [
-        { k: 'chain' },
-        { k: 'poly', c: 'dark', p: [[92, 375], [150, 356], [250, 330], [264, 346], [240, 366], [110, 396]], gloss: 0.4 },
-        { k: 'line', p: [[120, 372], [240, 344]], w: 5, c: 'body' },
-        { k: 'poly', c: 'dark', p: [[143, 288], [160, 298], [178, 315], [188, 333], [180, 335], [165, 318], [150, 302]], smooth: 1 },
-        { k: 'shock', a: [272, 322], b: [262, 256], w: 13 },
-        { k: 'poly', c: 'dark', p: [[210, 236], [285, 236], [275, 262], [255, 272], [235, 256]] },
-        { k: 'poly', c: 'frame', p: [[388, 168], [408, 172], [404, 240], [384, 300], [360, 330], [340, 330]] },
-        { k: 'poly', c: 'battery', p: [[254, 318], [350, 320], [356, 345], [342, 386], [262, 389], [250, 360]] },
-        { k: 'circle', at: [290, 355], r: 28, c: '#2c2e33' },
-        { k: 'ring', at: [290, 355], r: 19, w: 3, c: 'body' },
-        { k: 'circle', at: [290, 355], r: 7, c: '#8b8f95' },
-        { k: 'poly', c: 'body', p: [[280, 218], [330, 206], [372, 195], [388, 200], [392, 235], [378, 260], [362, 290], [348, 322], [290, 326], [256, 322], [250, 290], [262, 262]], smooth: 0.6, gloss: 1 },
-        { k: 'stripes', clip: [[284, 222], [372, 200], [386, 234], [362, 288], [346, 318], [292, 320], [258, 318], [254, 290], [266, 262]], c: 'dark', angle: -70, gap: 30, w: 9 },
-        { k: 'poly', c: 'accent', p: [[300, 286], [352, 282], [348, 294], [296, 298]], alpha: 0.85 },
-        { k: 'poly', c: 'seat', p: [[98, 200], [160, 207], [220, 214], [262, 218], [292, 214], [300, 222], [285, 236], [235, 242], [180, 230], [130, 212]], smooth: 1, gloss: 0.5 },
-        { k: 'fender', p: [[404, 242], [450, 232], [482, 236], [532, 266], [520, 267], [472, 250], [420, 254]], c: 'dark', edge: 'body' },
-        { k: 'fork', top: [394, 156], axle: [490, 385], split: 0.6, wUp: 17, wLow: 15 },
-        { k: 'line', p: [[452, 330], [470, 358]], w: 3, c: 'accent' },
-        { k: 'poly', c: 'dark', p: [[392, 250], [404, 256], [390, 320], [380, 322]] },
-        { k: 'poly', c: 'dark', p: [[380, 152], [410, 148], [414, 164], [384, 168]] },
-        { k: 'poly', c: 'dark', p: [[404, 160], [426, 158], [428, 180], [406, 182]] },
-        { k: 'rect', at: [424, 164], w: 4, h: 12, c: '#eaf2ff' },
-        { k: 'bars', clamp: [396, 144], grip: [376, 140], c: 'dark' },
-      ],
-      rider: { hip: [226, 211], peg: [264, 374], grip: [376, 140] },
-      light: [428, 170],
-      kit: { jersey: '#1f62e0', jersey2: '#ffffff', pants: '#1b1c1f', pants2: '#1f62e0', helmet: '#ffffff', helmet2: '#1f62e0', visor: '#1b1c1f', lens: '#9fd0ff', boots: '#1b1c1f', gloves: '#1f62e0' },
-    },
-
-    'eride-pro-ss': {
-      // The source photo is shot slightly from the front, so the front axle sits
-      // higher than the rear; `ref` shears that back out.
-      ref: { rear: [148, 325], front: [568, 300], wheelbase: 1.32, tyre: 105 },
-      pal: {
-        body: '#2b2d32', body2: '#1a1b1e', seat: '#3a3c42', frame: '#18191c', metal: '#9ea2a8',
-        dark: '#16171a', battery: '#232529', rim: '#141517', spoke: '#b9bcc1', accent: '#e0262d',
-        forkUp: '#141517', forkLow: '#1f2023', spring: '#18191c', shockBody: '#2a2b2f', chain: '#c9a34a', sprocket: '#c9ccd1',
-      },
-      sprocket: 44, drive: [375, 290], driveR: 11,
-      parts: [
-        { k: 'chain' },
-        { k: 'poly', c: 'dark', p: [[140, 305], [280, 272], [340, 258], [352, 286], [300, 306], [160, 346]], gloss: 0.4 },
-        { k: 'poly', c: 'dark', p: [[232, 212], [250, 222], [268, 240], [275, 262], [265, 262], [250, 240], [235, 225]], smooth: 1 },
-        { k: 'shock', a: [286, 252], b: [346, 204], w: 15 },
-        { k: 'poly', c: 'frame', p: [[270, 148], [345, 140], [356, 176], [336, 202], [310, 186]] },
-        { k: 'rect', at: [262, 150], w: 14, h: 8, c: 'accent' },
-        { k: 'poly', c: 'body', p: [[344, 128], [400, 110], [446, 104], [458, 112], [460, 142], [452, 258], [440, 290], [420, 312], [360, 316], [340, 300], [334, 250], [340, 190]], gloss: 0.7 },
-        { k: 'poly', c: '#3b3e45', p: [[352, 138], [440, 122], [446, 168], [360, 190]], gloss: 0.5 },
-        { k: 'fins', clip: [[422, 168], [452, 160], [450, 256], [424, 262]], c: '#121315', dir: 'v', gap: 5 },
-        { k: 'line', p: [[356, 196], [446, 172]], w: 2, c: 'accent' },
-        { k: 'circle', at: [375, 290], r: 31, c: '#1f2023' },
-        { k: 'ring', at: [375, 290], r: 22, w: 3, c: '#4a4d53' },
-        { k: 'circle', at: [375, 290], r: 8, c: '#8b8f95' },
-        { k: 'poly', c: 'seat', p: [[135, 99], [200, 107], [260, 118], [320, 126], [362, 124], [364, 140], [320, 150], [280, 152], [240, 142], [190, 122], [150, 104]], smooth: 1, gloss: 0.6 },
-        { k: 'fender', p: [[496, 140], [530, 132], [570, 130], [602, 137], [590, 142], [550, 143], [506, 150]], c: 'dark' },
-        { k: 'fork', top: [478, 72], axle: [568, 300], split: 0.56, wUp: 21, wLow: 17 },
-        { k: 'line', p: [[524, 206], [530, 214]], w: 4, c: 'accent' },
-        { k: 'poly', c: 'dark', p: [[462, 62], [492, 58], [500, 114], [478, 122]] },
-        { k: 'rect', at: [470, 64], w: 22, h: 7, c: '#eaf4ff' },
-        { k: 'poly', c: 'dark', p: [[452, 222], [468, 220], [462, 262], [450, 266]] },
-        { k: 'bars', clamp: [474, 64], grip: [392, 58], c: 'dark' },
-      ],
-      rider: { hip: [282, 122], peg: [300, 302], grip: [392, 58] },
-      light: [494, 68],
-      kit: { jersey: '#16171a', jersey2: '#e0262d', pants: '#16171a', pants2: '#5a5d63', helmet: '#16171a', helmet2: '#e0262d', visor: '#16171a', lens: '#ff5a3d', boots: '#e9e9ea', gloves: '#16171a' },
-    },
   };
 
   /* ------------------------------------------------------------------ */
@@ -214,7 +107,7 @@
     const R = tyre / ppm;
     const M = (pt) => [(pt[0] - rear[0]) / ppm, (rear[1] - (pt[1] + (pt[0] - rear[0]) * shear)) / ppm + R];
     const L = (px) => px / ppm;
-    const out = { R, WB: wheelbase, pal: art.pal, kit: art.kit, parts: [] };
+    const out = { R, WB: wheelbase, pal: art.pal, kit: art.kit, style: art.style || {}, parts: [] };
     out.sprocketR = L(art.sprocket || 30);
     out.drive = M(art.drive);
     out.driveR = L(art.driveR || 10);
@@ -222,7 +115,7 @@
       const q = Object.assign({}, part);
       if (q.p) q.p = q.p.map(M);
       if (q.clip) q.clip = q.clip.map(M);
-      for (const key of ['at', 'a', 'b', 'top', 'axle', 'clamp', 'grip']) if (q[key]) q[key] = M(q[key]);
+      for (const key of ['at', 'a', 'b', 'top', 'axle', 'clamp', 'grip', 'badge', 'mount']) if (q[key]) q[key] = M(q[key]);
       if (q.k === 'fork') q.axle = [wheelbase, R];
       for (const key of ['r', 'w', 'h', 'wUp', 'wLow', 'gap']) if (typeof q[key] === 'number') q[key] = L(q[key]);
       out.parts.push(q);
@@ -352,36 +245,47 @@
   /* Wheels                                                              */
   /* ------------------------------------------------------------------ */
 
-  function drawWheel(ctx, c, R, pal, spin, blur, disc, sprocketR) {
+  // Tread patterns: knob count, width and height (m) of the big crown knobs.
+  const TREADS = {
+    mx: { n: 50, w: 0.02, h: 0.017, shoulder: true },      // intermediate motocross knobby
+    soft: { n: 38, w: 0.022, h: 0.024, shoulder: true },   // soft / sand: taller, wider spaced
+    mud: { n: 26, w: 0.026, h: 0.03, shoulder: false },    // mud: big paddles, lots of gap
+    hard: { n: 64, w: 0.016, h: 0.012, shoulder: true },   // hard pack: low, dense blocks
+    trials: { n: 80, w: 0.012, h: 0.009, shoulder: false },// trials: fine tread, soft rubber
+  };
+
+  function drawWheel(ctx, c, R, st, spin, blur, discR, sprocketR) {
     const [cx, cy] = c;
     const rimR = R * 0.76;
+    const tyre = st.tyre || {};
+    const T = TREADS[tyre.tread] || TREADS.mx;
     // tyre carcass: a ring, so the wheel stays see-through between the spokes
     ctx.beginPath();
     ctx.arc(cx, cy, R - 0.02, 0, TAU);
     ctx.arc(cx, cy, rimR + 0.008, 0, TAU, true);
     ctx.fillStyle = '#151618';
     ctx.fill();
-    // tread: big staggered knobs on the crown, smaller shoulder knobs between
     ctx.save();
     ctx.translate(cx, cy);
     ctx.rotate(spin);
-    const knobs = 50;
-    for (let i = 0; i < knobs; i++) {
+    for (let i = 0; i < T.n; i++) {
       // slightly irregular blocks, like a worn knobby
       const j = Math.sin(i * 12.9898) * 43758.5453, n = j - Math.floor(j);
-      const w = 0.02 + n * 0.01, h = 0.017 + (1 - n) * 0.008;
+      const w = T.w * (1 + n * 0.5), h = T.h * (1 + (1 - n) * 0.45);
       ctx.save();
-      ctx.rotate((i * TAU) / knobs);
+      ctx.rotate((i * TAU) / T.n);
       ctx.beginPath();
-      ctx.moveTo(R - h, -w / 2); ctx.lineTo(R, -w * 0.38); ctx.lineTo(R, w * 0.38); ctx.lineTo(R - h, w / 2);
+      ctx.moveTo(R - 0.018 - h * 0.1, -w / 2); ctx.lineTo(R - 0.02 + h, -w * 0.38); ctx.lineTo(R - 0.02 + h, w * 0.38); ctx.lineTo(R - 0.018 - h * 0.1, w / 2);
       ctx.closePath();
       ctx.fillStyle = n > 0.5 ? '#232428' : '#1f2023';
       ctx.fill();
       ctx.fillStyle = 'rgba(255,255,255,0.09)';
-      ctx.fillRect(R - 0.004, -w * 0.38, 0.004, w * 0.76);
-      ctx.rotate(TAU / knobs / 2);
-      ctx.fillStyle = '#1c1d20';
-      ctx.fillRect(R - 0.032, -0.008, 0.014, 0.016);
+      ctx.fillRect(R - 0.024 + h, -w * 0.38, 0.004, w * 0.76);
+      if (T.shoulder) {
+        ctx.rotate(TAU / T.n / 2);
+        ctx.fillStyle = '#1c1d20';
+        ctx.fillRect(R - 0.032, -0.008, 0.014, 0.016);
+      }
       ctx.restore();
     }
     ctx.restore();
@@ -396,11 +300,25 @@
     ctx.lineWidth = R * 0.05;
     ctx.strokeStyle = 'rgba(255,255,255,0.05)';
     ctx.stroke();
+    // sidewall lettering, as two coloured flashes that turn with the wheel
+    if (tyre.wall) {
+      ctx.save();
+      ctx.translate(cx, cy);
+      ctx.rotate(spin);
+      ctx.strokeStyle = tyre.wall;
+      ctx.lineWidth = R * 0.045;
+      for (const a0 of [0.3, Math.PI + 0.3]) {
+        ctx.beginPath();
+        ctx.arc(0, 0, R * 0.86, a0, a0 + 0.55);
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
     // rim
     ctx.beginPath();
     ctx.arc(cx, cy, rimR, 0, TAU);
     ctx.lineWidth = 0.022;
-    ctx.strokeStyle = pal.rim;
+    ctx.strokeStyle = st.rim;
     ctx.stroke();
     ctx.beginPath();
     ctx.arc(cx, cy, rimR - 0.006, Math.PI * 0.15, Math.PI * 0.85);
@@ -412,7 +330,7 @@
     ctx.translate(cx, cy);
     ctx.rotate(spin);
     ctx.globalAlpha = 1 - 0.75 * blur;
-    ctx.strokeStyle = pal.spoke;
+    ctx.strokeStyle = st.spoke;
     ctx.lineWidth = 0.0032;
     ctx.beginPath();
     const spokes = 36;
@@ -445,115 +363,346 @@
       ctx.closePath();
       ctx.moveTo(sprocketR * 0.55, 0);
       ctx.arc(0, 0, sprocketR * 0.55, 0, TAU, true);
-      ctx.fillStyle = pal.sprocket;
+      ctx.fillStyle = st.sprocket;
       ctx.fill();
       ctx.restore();
     }
-    // wave brake disc with drilled holes
-    if (disc) {
-      ctx.save();
-      ctx.translate(cx, cy);
-      ctx.rotate(spin);
-      ctx.beginPath();
-      const waves = 12;
-      for (let i = 0; i <= waves * 4; i++) {
-        const a = (i * TAU) / (waves * 4);
-        const r = disc * (i % 4 === 0 ? 0.94 : 1);
-        ctx.lineTo(Math.cos(a) * r, Math.sin(a) * r);
-      }
-      ctx.closePath();
-      ctx.moveTo(disc * 0.7, 0);
-      ctx.arc(0, 0, disc * 0.7, 0, TAU, true);
-      ctx.fillStyle = '#b9bdc3';
-      ctx.fill();
-      ctx.fillStyle = '#5f6369';
-      for (let i = 0; i < 18; i++) {
-        const a = (i * TAU) / 18;
-        ctx.beginPath();
-        ctx.arc(Math.cos(a) * disc * 0.84, Math.sin(a) * disc * 0.84, 0.0045, 0, TAU);
-        ctx.fill();
-      }
-      // carrier spokes to the hub
-      ctx.strokeStyle = '#8d9197';
-      ctx.lineWidth = 0.01;
-      ctx.beginPath();
-      for (let i = 0; i < 5; i++) {
-        const a = (i * TAU) / 5;
-        ctx.moveTo(Math.cos(a) * 0.04, Math.sin(a) * 0.04);
-        ctx.lineTo(Math.cos(a + 0.3) * disc * 0.72, Math.sin(a + 0.3) * disc * 0.72);
-      }
-      ctx.stroke();
-      ctx.restore();
-    }
+    if (discR) drawDisc(ctx, discR, st.disc || {}, spin, cx, cy);
     // hub
-    circle(ctx, c, 0.045, '#9ca0a6');
+    circle(ctx, c, 0.045, st.hub || '#9ca0a6');
     circle(ctx, c, 0.02, '#5d6167');
   }
 
-  /* ------------------------------------------------------------------ */
-  /* Components                                                          */
-  /* ------------------------------------------------------------------ */
-
-  function drawFork(ctx, q, pal, axle) {
-    const { top, split, wUp, wLow } = q;
-    const mid = [top[0] + (axle[0] - top[0]) * split, top[1] + (axle[1] - top[1]) * split];
-    // outer (upper) tubes, lower legs, and a short polished stanchion between them
-    stroke(ctx, [top, mid], wUp, pal.forkUp, 'butt');
-    const dx = axle[0] - top[0], dy = axle[1] - top[1], len = Math.hypot(dx, dy);
-    const ux = dx / len, uy = dy / len;
-    const stan = [mid[0] + ux * 0.05, mid[1] + uy * 0.05];
-    stroke(ctx, [mid, stan], wLow * 0.8, '#d7dade', 'butt');
-    stroke(ctx, [stan, axle], wLow, pal.forkLow, 'round');
-    // highlight down the tubes
-    stroke(ctx, [[top[0] - uy * wUp * 0.25, top[1] + ux * wUp * 0.25], [mid[0] - uy * wUp * 0.25, mid[1] + ux * wUp * 0.25]], wUp * 0.18, 'rgba(255,255,255,0.28)', 'butt');
-    // axle lug and caliper
-    circle(ctx, axle, 0.03, pal.forkLow);
+  // Brake disc: wave (petal) or round, drilled, on a carrier to the hub.
+  function drawDisc(ctx, r, d, spin, cx, cy) {
     ctx.save();
-    ctx.translate(axle[0], axle[1]);
-    ctx.rotate(Math.atan2(uy, ux) + Math.PI / 2);
-    ctx.fillStyle = '#2b2d31';
-    ctx.fillRect(-0.075, -0.03, 0.05, 0.07);
+    ctx.translate(cx, cy);
+    ctx.rotate(spin);
+    r *= d.scale || 1;
+    ctx.beginPath();
+    const waves = d.style === 'round' ? 0 : 12;
+    if (waves) {
+      for (let i = 0; i <= waves * 4; i++) {
+        const a = (i * TAU) / (waves * 4);
+        ctx.lineTo(Math.cos(a) * r * (i % 4 === 0 ? 0.94 : 1), Math.sin(a) * r * (i % 4 === 0 ? 0.94 : 1));
+      }
+      ctx.closePath();
+    } else ctx.arc(0, 0, r, 0, TAU);
+    ctx.moveTo(r * 0.7, 0);
+    ctx.arc(0, 0, r * 0.7, 0, TAU, true);
+    ctx.fillStyle = d.c || '#b9bdc3';
+    ctx.fill();
+    ctx.fillStyle = '#5f6369';
+    for (let i = 0; i < 18; i++) {
+      const a = (i * TAU) / 18;
+      ctx.beginPath();
+      ctx.arc(Math.cos(a) * r * 0.84, Math.sin(a) * r * 0.84, 0.0045, 0, TAU);
+      ctx.fill();
+    }
+    // carrier: a coloured spider on floating discs, plain spokes otherwise
+    ctx.strokeStyle = d.carrier || '#8d9197';
+    ctx.lineWidth = d.carrier ? 0.014 : 0.01;
+    ctx.beginPath();
+    for (let i = 0; i < 5; i++) {
+      const a = (i * TAU) / 5;
+      ctx.moveTo(Math.cos(a) * 0.04, Math.sin(a) * 0.04);
+      ctx.lineTo(Math.cos(a + 0.3) * r * 0.72, Math.sin(a + 0.3) * r * 0.72);
+    }
+    ctx.stroke();
+    if (d.carrier) {
+      ctx.fillStyle = d.carrier;
+      for (let i = 0; i < 5; i++) {
+        const a = (i * TAU) / 5 + 0.3;
+        ctx.beginPath(); ctx.arc(Math.cos(a) * r * 0.72, Math.sin(a) * r * 0.72, 0.006, 0, TAU); ctx.fill();
+      }
+    }
     ctx.restore();
-    // triple clamps
-    const tc = (t) => [top[0] + dx * t, top[1] + dy * t];
-    stroke(ctx, [tc(0.02), [tc(0.02)[0] - 0.05, tc(0.02)[1] - 0.005]], 0.035, '#2a2b2f', 'round');
-    stroke(ctx, [tc(0.17), [tc(0.17)[0] - 0.06, tc(0.17)[1] + 0.005]], 0.035, '#2a2b2f', 'round');
   }
 
-  function drawShock(ctx, q, pal) {
+  // Brake caliper, fixed to the fork leg or swingarm, over the disc edge.
+  function drawCaliper(ctx, at, ang, R, st) {
+    const cal = st.caliper || {};
+    const pistons = cal.pistons || 2;
+    const len = 0.05 + pistons * 0.008;
+    ctx.save();
+    ctx.translate(at[0], at[1]);
+    ctx.rotate(ang);
+    ctx.translate(R, 0);
+    ctx.beginPath();
+    ctx.roundRect ? ctx.roundRect(-0.018, -len / 2, 0.036, len, 0.01) : ctx.rect(-0.018, -len / 2, 0.036, len);
+    ctx.fillStyle = cal.c || '#2b2d31';
+    ctx.fill();
+    ctx.fillStyle = 'rgba(255,255,255,0.25)';
+    ctx.fillRect(-0.014, -len / 2 + 0.006, 0.006, len - 0.012);
+    if (cal.label) {
+      ctx.fillStyle = cal.label;
+      ctx.fillRect(0.002, -len * 0.3, 0.008, len * 0.6);
+    }
+    ctx.restore();
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* Components (all restyled by the parts you fit)                      */
+  /* ------------------------------------------------------------------ */
+
+  // Upside-down fork: big outer tubes clamped at the top, the stanchions
+  // sliding out of them, and a guard and axle foot at the bottom that move
+  // with the wheel. A darker far leg sits just behind.
+  function drawFork(ctx, q, st, axle, R) {
+    const f = st.fork || {};
+    const { top, wUp, wLow } = q;
+    const axle0 = q.axle;
+    const L0 = Math.hypot(axle0[0] - top[0], axle0[1] - top[1]);
+    const ux = (axle0[0] - top[0]) / L0, uy = (axle0[1] - top[1]) / L0;
+    const along = (p, d) => [p[0] + ux * d, p[1] + uy * d];
+    const tubeEnd = along(top, L0 * q.split);
+    const guardLen = L0 * (q.guard || 0.36);
+    const guardTop = along(axle, -guardLen);
+    const leg = (dx, dy, dim) => {
+      const o = (p) => [p[0] + dx, p[1] + dy];
+      const sh = (c) => (dim ? shade(c, -0.45) : c);
+      // stanchion, visible between the outer tube and the guard
+      stroke(ctx, [o(along(tubeEnd, -0.02)), o(guardTop)], wLow * 0.74, sh(f.stanchion || '#d7dade'), 'butt');
+      // outer tube
+      stroke(ctx, [o(top), o(tubeEnd)], wUp, sh(f.upper || '#c69f6c'), 'butt');
+      if (!dim) {
+        stroke(ctx, [o([top[0] - uy * wUp * 0.25, top[1] + ux * wUp * 0.25]), o([tubeEnd[0] - uy * wUp * 0.25, tubeEnd[1] + ux * wUp * 0.25])], wUp * 0.16, 'rgba(255,255,255,0.3)', 'butt');
+        stroke(ctx, [o(along(tubeEnd, -0.012)), o(tubeEnd)], wUp * 1.04, shade(f.upper || '#c69f6c', -0.35), 'butt');
+        if (f.ring) stroke(ctx, [o(along(top, L0 * 0.36)), o(along(top, L0 * 0.36 + 0.012))], wUp * 1.02, f.ring, 'butt');
+      }
+      // guard and axle foot
+      stroke(ctx, [o(guardTop), o(along(axle, -0.01))], wLow, sh(f.guard || '#1c1d20'), 'butt');
+      circle(ctx, o(axle), wLow * 0.62, sh(f.guard || '#1c1d20'));
+      if (!dim && f.decal) stroke(ctx, [o(along(guardTop, guardLen * 0.35)), o(along(guardTop, guardLen * 0.55))], wLow * 0.42, f.decal, 'butt');
+    };
+    leg(-0.022, 0.012, true);
+    leg(0, 0, false);
+    // brake caliper behind the leg, at the disc's edge
+    drawCaliper(ctx, axle, Math.atan2(uy, ux) + Math.PI * 0.62, R * 0.36, st);
+    // triple clamps
+    const clamp = (p, w) => {
+      ctx.save();
+      ctx.translate(p[0], p[1]);
+      ctx.rotate(Math.atan2(uy, ux) + Math.PI / 2);
+      ctx.beginPath();
+      ctx.roundRect ? ctx.roundRect(-w * 0.75, -0.016, w * 1.5, 0.032, 0.01) : ctx.rect(-w * 0.75, -0.016, w * 1.5, 0.032);
+      ctx.fillStyle = f.clamp || '#2a2b2f';
+      ctx.fill();
+      ctx.restore();
+    };
+    clamp(along(top, 0.012), wUp);
+    clamp(along(top, q.lower || 0.15), wUp);
+  }
+
+  // Rear shock between its frame mount (b) and its linkage (a). A coil over
+  // a damper body, with a piggyback reservoir on some.
+  function drawShock(ctx, q, st) {
+    const sk = st.shock || {};
     const { a, b, w } = q;
     const dx = b[0] - a[0], dy = b[1] - a[1], len = Math.hypot(dx, dy);
     ctx.save();
     ctx.translate(a[0], a[1]);
     ctx.rotate(Math.atan2(dy, dx));
-    // damper body
-    ctx.fillStyle = pal.shockBody;
-    ctx.fillRect(0, -w * 0.28, len, w * 0.56);
-    ctx.fillStyle = '#c9ccd1';
-    ctx.fillRect(len * 0.05, -w * 0.12, len * 0.3, w * 0.24);
-    // coil
-    ctx.strokeStyle = pal.spring;
-    ctx.lineWidth = w * 0.22;
-    ctx.lineCap = 'round';
-    const coils = 7, s0 = len * 0.22, s1 = len * 0.88;
-    ctx.beginPath();
-    for (let i = 0; i <= coils; i++) {
-      const x = s0 + ((s1 - s0) * i) / coils;
-      ctx.moveTo(x - w * 0.12, -w * 0.5);
-      ctx.lineTo(x + w * 0.12, w * 0.5);
+    if (sk.reservoir) {
+      ctx.fillStyle = sk.reservoir;
+      ctx.beginPath();
+      ctx.roundRect ? ctx.roundRect(len * 0.55, w * 0.32, len * 0.4, w * 0.42, w * 0.2) : ctx.rect(len * 0.55, w * 0.32, len * 0.4, w * 0.42);
+      ctx.fill();
     }
-    ctx.stroke();
-    // mounts
+    // damper body and shaft
+    ctx.fillStyle = sk.body || '#2a2b2f';
+    ctx.fillRect(len * 0.42, -w * 0.3, len * 0.5, w * 0.6);
+    ctx.fillStyle = '#c9ccd1';
+    ctx.fillRect(len * 0.06, -w * 0.11, len * 0.4, w * 0.22);
+    // coil (or an air can)
+    if (sk.air) {
+      ctx.fillStyle = sk.spring;
+      ctx.beginPath();
+      ctx.roundRect ? ctx.roundRect(len * 0.2, -w * 0.38, len * 0.5, w * 0.76, w * 0.3) : ctx.rect(len * 0.2, -w * 0.38, len * 0.5, w * 0.76);
+      ctx.fill();
+    } else {
+      ctx.strokeStyle = sk.spring || '#c69f6c';
+      ctx.lineWidth = w * 0.2;
+      ctx.lineCap = 'round';
+      const coils = 7, s0 = len * 0.16, s1 = len * 0.84;
+      ctx.beginPath();
+      for (let i = 0; i <= coils; i++) {
+        const x = s0 + ((s1 - s0) * i) / coils;
+        ctx.moveTo(x - w * 0.1, -w * 0.5);
+        ctx.lineTo(x + w * 0.1, w * 0.5);
+      }
+      ctx.stroke();
+      // spring seats
+      ctx.fillStyle = sk.collar || '#3b3d42';
+      ctx.fillRect(s0 - w * 0.12, -w * 0.58, w * 0.18, w * 1.16);
+      ctx.fillRect(s1 - w * 0.06, -w * 0.58, w * 0.18, w * 1.16);
+    }
+    // eyes
     ctx.fillStyle = '#3b3d42';
-    ctx.beginPath(); ctx.arc(0, 0, w * 0.45, 0, TAU); ctx.fill();
-    ctx.beginPath(); ctx.arc(len, 0, w * 0.45, 0, TAU); ctx.fill();
+    ctx.beginPath(); ctx.arc(0, 0, w * 0.42, 0, TAU); ctx.fill();
+    ctx.beginPath(); ctx.arc(len, 0, w * 0.42, 0, TAU); ctx.fill();
     ctx.restore();
   }
 
-  function drawChain(ctx, art, spin) {
+  // Motor cover: the round end of a mid-drive motor, or the Varg's cast cover.
+  function drawMotor(ctx, q, st) {
+    const m = st.motor || {};
+    const [x, y] = q.at;
+    const r = q.r * (m.scale || 1);
+    ctx.save();
+    if (q.shape === 'oval') {
+      ctx.beginPath();
+      ctx.ellipse(x, y, r * 0.72, r, 0, 0, TAU);
+    } else {
+      ctx.beginPath();
+      ctx.arc(x, y, r, 0, TAU);
+    }
+    ctx.fillStyle = m.cover || '#16171a';
+    ctx.fill();
+    const g = ctx.createLinearGradient(0, y + r, 0, y - r);
+    g.addColorStop(0, 'rgba(255,255,255,0.28)');
+    g.addColorStop(0.45, 'rgba(255,255,255,0)');
+    g.addColorStop(1, 'rgba(0,0,0,0.25)');
+    ctx.fillStyle = g;
+    ctx.fill();
+    ctx.lineWidth = r * 0.06;
+    ctx.strokeStyle = 'rgba(0,0,0,0.5)';
+    ctx.stroke();
+    // accent ring (dashed on the Sur-Ron), cooling fins on big motors
+    if (m.ring) {
+      ctx.beginPath();
+      ctx.arc(x, y, r * 0.68, 0, TAU);
+      ctx.lineWidth = r * 0.1;
+      ctx.strokeStyle = m.ring;
+      if (m.dash) ctx.setLineDash([r * 0.35, r * 0.18]);
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+    if (m.fins) {
+      ctx.strokeStyle = 'rgba(0,0,0,0.35)';
+      ctx.lineWidth = r * 0.06;
+      for (let i = -3; i <= 3; i++) {
+        const yy = y + i * r * 0.22;
+        const half = Math.sqrt(Math.max(0, r * r * 0.7 - (yy - y) ** 2));
+        ctx.beginPath(); ctx.moveTo(x - half, yy); ctx.lineTo(x + half, yy); ctx.stroke();
+      }
+    }
+    circle(ctx, [x, y], r * 0.3, m.hub || '#2b2d31');
+    circle(ctx, [x - r * 0.08, y + r * 0.08], r * 0.12, 'rgba(255,255,255,0.18)');
+    if (m.label) {
+      ctx.fillStyle = m.label;
+      ctx.fillRect(x - r * 0.35, y - r * 0.62, r * 0.7, r * 0.12);
+    }
+    ctx.restore();
+  }
+
+  // Battery side: fins over the pack, and a badge for upgraded packs.
+  function drawBattery(ctx, q, st) {
+    const b = st.battery || {};
+    if (q.clip) {
+      tracePath(ctx, q.clip, false);
+      ctx.save();
+      ctx.clip();
+      const bb = bbox(q.clip);
+      ctx.fillStyle = b.c || 'rgba(0,0,0,0)';
+      ctx.fillRect(bb.x0, bb.y0, bb.x1 - bb.x0, bb.y1 - bb.y0);
+      ctx.strokeStyle = b.fins || 'rgba(10,11,13,0.55)';
+      ctx.lineWidth = 0.008;
+      ctx.beginPath();
+      for (let y = bb.y0; y <= bb.y1; y += 0.018) { ctx.moveTo(bb.x0, y); ctx.lineTo(bb.x1, y + 0.01); }
+      ctx.stroke();
+      ctx.restore();
+    }
+    if (b.badge && q.badge) {
+      const [x, y] = q.badge;
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.fillStyle = b.badge;
+      ctx.beginPath();
+      ctx.roundRect ? ctx.roundRect(-0.045, -0.018, 0.09, 0.036, 0.008) : ctx.rect(-0.045, -0.018, 0.09, 0.036);
+      ctx.fill();
+      ctx.fillStyle = b.badgeInk || '#111';
+      ctx.fillRect(-0.032, -0.006, 0.064, 0.012);
+      ctx.restore();
+    }
+  }
+
+  // Aftermarket controller, where it shows: a finned box with a coloured lid.
+  function drawController(ctx, q, st) {
+    const c = st.controller;
+    if (!c || !c.c) return;
+    const [x, y] = q.at, w = q.w, h = q.h;
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate(q.angle || 0);
+    ctx.beginPath();
+    ctx.roundRect ? ctx.roundRect(-w / 2, -h / 2, w, h, h * 0.2) : ctx.rect(-w / 2, -h / 2, w, h);
+    ctx.fillStyle = c.c;
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(0,0,0,0.45)';
+    ctx.lineWidth = h * 0.12;
+    ctx.beginPath();
+    for (let i = 1; i < 6; i++) { const xx = -w / 2 + (w * i) / 6; ctx.moveTo(xx, -h * 0.35); ctx.lineTo(xx, h * 0.35); }
+    ctx.stroke();
+    if (c.accent) { ctx.fillStyle = c.accent; ctx.fillRect(-w / 2, h * 0.28, w, h * 0.22); }
+    ctx.restore();
+  }
+
+  // Front lamp: the bike's own lamp, a bar-mounted LED pod, or an LED bar.
+  function drawLamp(ctx, q, st, lit) {
+    const L = st.light || {};
+    if (L.type === 'none') return;
+    const [x, y] = q.at;
+    // bracket back to the fork's top clamp
+    if (q.mount) stroke(ctx, [q.mount, q.at], 0.014, '#202125');
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate(q.angle || 0);
+    if (q.s) ctx.scale(q.s, q.s);
+    const glow = lit ? 1 : 0;
+    if (L.type === 'bar') {
+      // a slim LED bar across the bars
+      const w = 0.17, h = 0.04;
+      ctx.fillStyle = '#16171a';
+      ctx.fillRect(-w * 0.2, -h / 2, w * 0.4, h);
+      ctx.fillStyle = L.housing || '#1d1e21';
+      ctx.beginPath();
+      ctx.roundRect ? ctx.roundRect(0.0, -h / 2 - 0.02, 0.05, w, 0.01) : ctx.rect(0, -h / 2 - 0.02, 0.05, w);
+      ctx.fill();
+      ctx.fillStyle = glow ? '#fffbe8' : '#bcc6cf';
+      for (let i = 0; i < 4; i++) ctx.fillRect(0.034, -h / 2 - 0.012 + i * (w / 4.2), 0.012, w / 5.2);
+    } else if (L.type === 'pod') {
+      // a pair of square LED pods
+      for (const dy of [0.028, -0.028]) {
+        ctx.fillStyle = L.housing || '#1d1e21';
+        ctx.beginPath();
+        ctx.roundRect ? ctx.roundRect(-0.01, dy - 0.024, 0.055, 0.048, 0.008) : ctx.rect(-0.01, dy - 0.024, 0.055, 0.048);
+        ctx.fill();
+        ctx.fillStyle = glow ? '#fffbe8' : '#c9d3dc';
+        ctx.fillRect(0.034, dy - 0.018, 0.012, 0.036);
+      }
+    } else {
+      // stock round lamp in a shell
+      ctx.fillStyle = L.housing || '#18191c';
+      ctx.beginPath();
+      ctx.moveTo(-0.02, -0.035); ctx.lineTo(0.035, -0.04); ctx.lineTo(0.045, 0.04); ctx.lineTo(-0.02, 0.035);
+      ctx.closePath();
+      ctx.fill();
+      ctx.fillStyle = glow ? '#fff6dc' : '#aeb7c0';
+      ctx.beginPath(); ctx.ellipse(0.042, 0, 0.008, 0.034, 0, 0, TAU); ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  // Number plate on the front of the Varg (clear on this one).
+  function drawPlate(ctx, q, st) {
+    fillShape(ctx, q.p, (st.plate || 'rgba(235,238,242,0.88)'), { smooth: 0.6, gloss: 0.5 });
+  }
+
+  function drawChain(ctx, art, spin, st) {
     // Belt of links between the drive sprocket and the rear sprocket.
     const rear = art._dyn.rear, d = art.drive;
-    const r1 = art.sprocketR, r2 = art.driveR;
+    const r1 = art.sprocketR * (st.sprocketScale || 1), r2 = art.driveR;
     const ang = Math.atan2(d[1] - rear[1], d[0] - rear[0]);
     const n = [-Math.sin(ang), Math.cos(ang)];
     const top = [[rear[0] + n[0] * r1, rear[1] + n[1] * r1], [d[0] + n[0] * r2, d[1] + n[1] * r2]];
@@ -566,12 +715,12 @@
     ctx.strokeStyle = '#2a2b2e';
     ctx.stroke();
     ctx.lineWidth = 0.008;
-    ctx.strokeStyle = art.pal.chain;
+    ctx.strokeStyle = st.chain;
     ctx.setLineDash([0.008, 0.005]);
     ctx.lineDashOffset = -spin * art.R;
     ctx.stroke();
     ctx.restore();
-    circle(ctx, d, r2, art.pal.sprocket);
+    circle(ctx, d, r2, st.driveSprocket || st.sprocket);
   }
 
   function drawPattern(ctx, q, pal) {
@@ -617,7 +766,7 @@
   }
 
   function drawPart(ctx, q, art, spin) {
-    const pal = art.pal;
+    const pal = art.pal, st = art._st;
     switch (q.k) {
       case 'poly': fillShape(ctx, q.p, col(pal, q.c), { smooth: q.smooth, gloss: q.gloss, alpha: q.alpha }); break;
       case 'fender':
@@ -644,9 +793,14 @@
         ctx.fillStyle = col(pal, q.c);
         ctx.fillRect(q.at[0], q.at[1] - q.h, q.w, q.h);
         break;
-      case 'shock': drawShock(ctx, q, pal); break;
-      case 'chain': drawChain(ctx, art, spin); break;
-      case 'fork': drawFork(ctx, q, pal, art._dyn.front); break;
+      case 'shock': drawShock(ctx, q, st); break;
+      case 'chain': drawChain(ctx, art, spin, st); break;
+      case 'fork': drawFork(ctx, q, st, art._dyn.front, art.R); break;
+      case 'motor': drawMotor(ctx, q, st); break;
+      case 'battery': drawBattery(ctx, q, st); break;
+      case 'controller': drawController(ctx, q, st); break;
+      case 'lamp': drawLamp(ctx, q, st, art._lit); break;
+      case 'plate': drawPlate(ctx, q, st); break;
       case 'stripes': case 'fins': case 'grid': case 'blocks': drawPattern(ctx, q, pal); break;
       case 'traced':
         for (const L of art.layers) {
@@ -655,7 +809,7 @@
         }
         break;
       case 'bars':
-        stroke(ctx, [q.clamp, [q.clamp[0] - 0.02, q.clamp[1] + 0.03], q.grip], 0.024, col(pal, q.c));
+        stroke(ctx, [q.clamp, [q.clamp[0] - 0.02, q.clamp[1] + 0.03], q.grip], 0.024, (st.bars && st.bars.c) || col(pal, q.c));
         stroke(ctx, [[q.grip[0] + 0.035, q.grip[1] + 0.008], [q.grip[0] - 0.03, q.grip[1] - 0.006]], 0.034, '#101113');
         stroke(ctx, [[q.grip[0] + 0.03, q.grip[1] + 0.02], [q.grip[0] + 0.07, q.grip[1] + 0.005]], 0.008, '#2a2b2f');
         break;
@@ -838,7 +992,7 @@
   /* Public API                                                          */
   /* ------------------------------------------------------------------ */
 
-  // opts: { lean, spin, blur, rider (bool), pitch }
+  // opts: { lean, spin, blur, rider (bool), pitch, frontOff, rearOff, style, lit }
   function drawBike(ctx, id, opts = {}) {
     const art = COMPILED[id];
     const spin = -(opts.spin || 0);
@@ -864,8 +1018,12 @@
     const fo = opts.frontOff || 0, ro = opts.rearOff || 0;
     const fu = [-Math.sin(FORK_RAKE), Math.cos(FORK_RAKE)];
     art._dyn = { front: [art.WB + fo * fu[0], art.R + fo * fu[1]], rear: [0, art.R + ro], shift: [fo * fu[0], fo * fu[1]] };
-    drawWheel(ctx, art._dyn.rear, art.R, art.pal, spin, blur, art.R * 0.32, art.sprocketR);
-    drawWheel(ctx, art._dyn.front, art.R, art.pal, opts.frontSpin !== undefined ? -opts.frontSpin : spin, blur, art.R * 0.38, 0);
+    const st = art._st = styleFor(art, opts.style);
+    art._lit = !!opts.lit;
+    const rearSt = Object.assign({}, st, { tyre: st.rearTyre || st.tyre, disc: st.rearDisc || st.disc });
+    drawWheel(ctx, art._dyn.rear, art.R, rearSt, spin, blur, art.R * 0.32, art.sprocketR * (st.sprocketScale || 1));
+    drawCaliper(ctx, art._dyn.rear, Math.PI * 0.9, art.R * 0.3, rearSt);
+    drawWheel(ctx, art._dyn.front, art.R, st, opts.frontSpin !== undefined ? -opts.frontSpin : spin, blur, art.R * 0.38, 0);
     for (const q of art.parts) drawPart(ctx, q, art, spin);
 
     if (rider) {
@@ -874,6 +1032,20 @@
       drawArm(ctx, p, art.kit, false);
       drawHelmet(ctx, p, art.kit, opts.pitch || 0);
     }
+  }
+
+  // The bike's stock look, with any fitted parts' looks laid over it (one
+  // level deep: { fork: { upper } } replaces just the fork's upper colour).
+  function styleFor(art, extra) {
+    const out = {};
+    for (const k in art.style) out[k] = typeof art.style[k] === 'object' && art.style[k] ? Object.assign({}, art.style[k]) : art.style[k];
+    if (extra) {
+      for (const k in extra) {
+        const v = extra[k];
+        out[k] = v && typeof v === 'object' && !Array.isArray(v) && out[k] && typeof out[k] === 'object' ? Object.assign(out[k], v) : v;
+      }
+    }
+    return out;
   }
 
   // A rider on their own, for the crash tumble. Drawn around the hip.

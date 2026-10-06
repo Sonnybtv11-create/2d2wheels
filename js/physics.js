@@ -320,8 +320,16 @@
       events: [],                  // impacts etc. for sound and dust; the game drains it
       hit: new Set(),              // obstacles the front wheel has reached
       hitRear: new Set(),          // ... and the rear
-      police: opts.police ? { x: (opts.x || 0) - 60 - 4.8, v: 0, active: false, gap: 60 } : null,
+      police: opts.police ? createPolice(opts) : null,
+      stingers: [], nextStinger: 0,
+      rng: mulberry32((opts.seed || 1) ^ 0x51ce),
     };
+  }
+
+  function createPolice(opts) {
+    const level = clamp(Math.round(opts.wanted || 2), 1, 5);
+    const cfg = Object.assign({}, COP, WANTED[level]);
+    return { x: (opts.x || 0) - cfg.startGap - COP.length, v: 0, active: false, gap: cfg.startGap, level, cfg };
   }
 
   function balanceAngle(s, h) {
@@ -515,6 +523,36 @@
       }
     }
 
+    /* --- stingers --- */
+    // Spike strips laid across the track ahead. The front tyre has to be off
+    // the ground when it reaches one; the rear rolls over the strip after the
+    // front has dragged it flat.
+    const P = s.police;
+    if (P && P.active && P.cfg.stingers) {
+      if (!s.nextStinger) s.nextStinger = s.time + P.cfg.stingers[0] * 0.5;
+      if (s.time >= s.nextStinger) {
+        const [lo, hi] = P.cfg.stingers;
+        s.nextStinger = s.time + lo + s.rng() * (hi - lo);
+        let sx = s.x + WB + Math.max(STINGER.minAhead, s.v * STINGER.lead);
+        // keep clear of obstacles, so there's room to land and pop again
+        while (terrain.obstaclesNear(sx - 6, sx + 6).length) sx += 4;
+        const st = { x: sx, w: STINGER.w, t: s.time, hit: false };
+        s.stingers.push(st);
+        s.events.push({ type: 'stinger', stinger: st });
+      }
+    }
+    for (const st of s.stingers) {
+      if (st.hit || Math.abs(fx - st.x) > st.w / 2 + R * 0.3) continue;
+      st.hit = true;
+      if (frontFree < terrain.base(st.x) + 0.08) {
+        s.events.push({ type: 'impact', obstacle: { type: 'stinger', x: st.x, w: st.w, h: 0.04 }, strength: 2, end: 'front', v: s.v });
+        crash(s, 'Stingered');
+        return;
+      }
+      s.events.push({ type: 'clear', obstacle: { type: 'stinger', x: st.x, w: st.w, h: 0.04 }, stinger: st });
+    }
+    if (s.stingers.length && s.stingers[0].x < s.x - 40) s.stingers.shift();
+
     if (s.theta >= CRASH_ANGLE) { crash(s, 'Looped out'); return; }
     if (s.theta < -25 * DEG) { crash(s, 'Went over the bars'); return; }
 
@@ -560,20 +598,34 @@
     length: 4.8,        // the car
   };
 
+  // Wanted levels: how hard the police come after you. Two stars is the
+  // standard chase (COP above). From three stars they lay stingers ahead of
+  // you; from four a helicopter keeps you in sight, so the cars never fall
+  // far behind; at five an interceptor replaces the cruiser.
+  const WANTED = [
+    null,
+    { startAfter: 7, base: 0.6, ramp: 0.003, cap: 1.05, catchUp: 0.3, catchFrom: 60, mult: 1 },
+    { mult: 1.5 },
+    { startAfter: 3, base: 0.72, ramp: 0.0055, cap: 1.22, catchFrom: 40, stingers: [24, 36], mult: 2 },
+    { startAfter: 3, base: 0.74, ramp: 0.006, cap: 1.25, catchUp: 0.7, catchFrom: 28, stingers: [18, 28], heli: true, mult: 3 },
+    { startAfter: 2, base: 0.76, ramp: 0.0065, cap: 1.28, catchUp: 0.8, catchFrom: 24, accel: 6, stingers: [14, 22], heli: true, interceptor: true, mult: 4 },
+  ];
+  const STINGER = { w: 0.5, lead: 3.2, minAhead: 55 };
+
   function stepPolice(s, h, dt, ended) {
-    const p = s.police;
-    if (!p.active && s.time > COP.startAfter) p.active = true;
+    const p = s.police, C = p.cfg;
+    if (!p.active && s.time > C.startAfter) p.active = true;
     if (!p.active) { p.gap = s.x - p.x - COP.length; return; }
     const gap = s.x - p.x - COP.length;
-    let target = Math.min(h.vmax, COP.refCap) * Math.min(COP.cap, COP.base + COP.ramp * s.time);
-    if (gap > COP.catchFrom) target *= 1 + COP.catchUp * Math.min(1, (gap - COP.catchFrom) / 60);
+    let target = Math.min(h.vmax, COP.refCap) * Math.min(C.cap, C.base + C.ramp * s.time);
+    if (gap > C.catchFrom) target *= 1 + C.catchUp * Math.min(1, (gap - C.catchFrom) / 60);
     let brake = 8;
     if (ended) {
       // pull up behind the stopped bike rather than through it
       target = Math.min(target, s.v + (gap > 2 ? 3 : 0));
       brake = clamp((p.v * p.v - s.v * s.v) / (2 * Math.max(0.5, gap - 2)), 8, 40);
     }
-    p.v += clamp(target - p.v, -brake * dt, COP.accel * dt);
+    p.v += clamp(target - p.v, -brake * dt, C.accel * dt);
     p.x += p.v * dt;
     if (ended) p.x = Math.min(p.x, s.x - COP.length - 0.5);
     p.gap = s.x - p.x - COP.length;
@@ -611,7 +663,7 @@
   }
 
   const api = {
-    G, DEG, CRASH_ANGLE, COM_ANGLE, FIXED_DT, FORK_RAKE, TUNE, COP, OBSTACLES,
+    G, DEG, CRASH_ANGLE, COM_ANGLE, FIXED_DT, FORK_RAKE, TUNE, COP, WANTED, STINGER, OBSTACLES,
     deriveHandling, driveAt, boostAt, pitchGainAt, wheelOffsets, chassisY,
     createTerrain, createWeather, createState, step, substep, balanceAngle, mulberry32, obstacleProfile,
   };

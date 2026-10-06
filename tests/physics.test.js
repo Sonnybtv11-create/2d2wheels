@@ -17,9 +17,9 @@ function flatTrack(seed = 1) {
   return t;
 }
 
-function ride(bike, policy, { terrain = flatTrack(), maxT = 120, police = false } = {}) {
+function ride(bike, policy, { terrain = flatTrack(), maxT = 120, police = false, wanted = 2 } = {}) {
   const h = Sim.deriveHandling(bike);
-  const s = Sim.createState({ police });
+  const s = Sim.createState({ police, wanted });
   let liftAt = null;
   while (s.status === 'riding' && s.time < maxT) {
     Sim.substep(s, policy(s, h), h, terrain, Sim.FIXED_DT);
@@ -45,8 +45,8 @@ function balancer(s, h) {
   return { throttle: err > 0, brake: err < -6 * D, lean: 1 };
 }
 
-test('roster has five bikes with the specs the game needs', () => {
-  assert.equal(BIKES.length, 5);
+test('roster has the Sur-Ron and the Varg with the specs the game needs', () => {
+  assert.deepEqual(BIKES.map((b) => b.id), ['surron-lbx', 'stark-varg-mx']);
   for (const b of BIKES) {
     for (const k of ['peakPowerKw', 'weightKg', 'topSpeedKmh']) assert.ok(b[k] > 0, `${b.id}.${k}`);
     assert.ok(b.sources.length > 0, `${b.id} has sources`);
@@ -78,10 +78,8 @@ test('pinning the throttle loops the bike out, and gives the player time to reac
     assert.ok(s.time > 1.2, `${b.name} looped out after only ${s.time.toFixed(2)} s`);
     times[b.id] = s.time;
   }
-  // More power loops sooner. The Varg is grip-limited (it spins the rear), so
-  // it can only match the E Ride.
-  assert.ok(times['eride-pro-ss'] < times['talaria-mx4'] && times['talaria-mx4'] < times['surron-lbx']);
-  assert.ok(times['stark-varg-mx'] < times['talaria-mx4']);
+  // More power loops sooner.
+  assert.ok(times['stark-varg-mx'] < times['surron-lbx']);
 });
 
 test('letting off sets the front back down on the fork and the ride goes on', () => {
@@ -91,7 +89,7 @@ test('letting off sets the front back down on the fork and the ride goes on', ()
 });
 
 test('braking on two wheels dives the fork', () => {
-  const b = byId('talaria-mx4');
+  const b = byId('surron-lbx');
   const h = Sim.deriveHandling(b);
   const t = flatTrack();
   const s = Sim.createState();
@@ -138,7 +136,7 @@ test('the throttle can still lift the nose at top speed', () => {
 });
 
 test('a held wheelie is faster than riding flat out on two wheels (wheelie boost)', () => {
-  for (const id of ['surron-lbx', 'talaria-mx4']) {
+  for (const id of ['surron-lbx']) {
     const { s, h } = ride(byId(id), balancer, { maxT: 45 });
     assert.ok(s.inWheelie && s.v > h.vmax, `${id}: ${(s.v * 3.6).toFixed(0)} km/h vs top ${(h.vmax * 3.6).toFixed(0)}`);
   }
@@ -163,7 +161,7 @@ test('the front wheel into a tyre stack crashes; a timed pop clears it', () => {
 });
 
 test('logs can be ridden over with the front down, at a cost in speed', () => {
-  const b = byId('talaria-mx4');
+  const b = byId('surron-lbx');
   const t = flatTrack();
   t.obstacles.push({ type: 'log', x: 60, w: 0.25, h: 0.25, tall: false, soft: false });
   const h = Sim.deriveHandling(b);
@@ -187,7 +185,7 @@ test('the police catch a rider who dawdles, but not one holding a fast wheelie',
 });
 
 test('a wet track gives less grip than a dry one', () => {
-  const b = byId('eride-pro-ss');
+  const b = byId('stark-varg-mx');
   const launch = (env) => {
     const t = flatTrack();
     t.env = env;
@@ -243,4 +241,41 @@ test('terrain is deterministic per seed and starts flat', () => {
   for (const x of [0, 10, 100, 523.7, 4000]) assert.equal(t1.height(x), t2.height(x));
   for (let x = 0; x < 60; x += 1) assert.equal(t1.slope(x), 0);
   assert.ok(t1.obstacles.length > 50 && t1.obstacles.some((o) => o.tall) && t1.obstacles.some((o) => o.type === 'log'));
+});
+
+test('higher wanted levels catch a slow rider sooner', () => {
+  const b = byId('surron-lbx');
+  const cruise = (st) => ({ throttle: st.v < 9, lean: -1 });
+  const at = [1, 3, 5].map((wanted) => ride(b, cruise, { maxT: 120, police: true, wanted }).s);
+  for (const s of at) assert.equal(s.status, 'busted');
+  assert.ok(at[0].time > at[1].time && at[1].time > at[2].time, at.map((s) => s.time.toFixed(1)).join(' > '));
+});
+
+test('a stinger ends the run unless the front wheel is off the ground', () => {
+  const b = byId('surron-lbx');
+  for (const [policy, expect] of [[() => ({ throttle: true, lean: -1 }), 'crashed'], [balancer, 'riding']]) {
+    const h = Sim.deriveHandling(b);
+    const t = flatTrack();
+    const s = Sim.createState({ police: true, wanted: 3 });
+    s.nextStinger = 1e9; // lay our own
+    s.stingers.push({ x: 120, w: Sim.STINGER.w, t: 0, hit: false });
+    while (s.status === 'riding' && s.x < 130) { Sim.substep(s, policy(s, h), h, t, Sim.FIXED_DT); s.events.length = 0; }
+    assert.equal(s.status, expect, s.cause);
+    if (expect === 'crashed') assert.equal(s.cause, 'Stingered');
+  }
+});
+
+test('from three stars the police lay stingers well ahead of the bike', () => {
+  const b = byId('surron-lbx');
+  const h = Sim.deriveHandling(b);
+  const t = flatTrack();
+  const s = Sim.createState({ police: true, wanted: 3 });
+  const laid = [];
+  while (s.time < 60 && s.status === 'riding') {
+    Sim.substep(s, balancer(s, h), h, t, Sim.FIXED_DT);
+    for (const e of s.events) if (e.type === 'stinger') laid.push(e.stinger.x - s.x);
+    s.events.length = 0;
+  }
+  assert.ok(laid.length >= 2, `${laid.length} stingers`);
+  for (const d of laid) assert.ok(d >= Sim.STINGER.minAhead, `laid only ${d.toFixed(0)} m ahead`);
 });

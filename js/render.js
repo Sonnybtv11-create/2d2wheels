@@ -661,53 +661,75 @@
 
   // The police cruiser: black-and-white sedan with a flashing light bar.
   // Drawn in metres from the rear bumper at (x, ground), y up.
-  function drawPolice(ctx, view, terrain, p, t) {
+  // o.interceptor: the five-star unmarked car. o.parked: { s, lift, alpha }
+  // draws a smaller car parked back on the far side of the tape.
+  function drawPolice(ctx, view, terrain, p, t, o = {}) {
     const { scale, camX, toScreenY, w } = view;
     const L = 4.8;
     const sx0 = (p.x - camX) * scale;
     if (sx0 > w + 50 || sx0 + L * scale < -50) return;
+    const pk = o.parked;
     const rw = p.x + 0.9, fw = p.x + 3.9, R = 0.34;
-    const yr = terrain.wheelY(rw, R), yf = terrain.wheelY(fw, R);
-    const ang = Math.atan2(yf - yr, fw - rw);
-    const bob = Math.sin(t * 9) * 0.01;
+    const yr = pk ? terrain.surface(rw) : terrain.wheelY(rw, R), yf = pk ? terrain.surface(fw) : terrain.wheelY(fw, R);
+    const ang = pk ? 0 : Math.atan2(yf - yr, fw - rw);
+    const bob = pk ? 0 : Math.sin(t * 9) * 0.01;
+    const k = pk ? pk.s : 1;
     ctx.save();
-    ctx.translate((rw - camX) * scale, toScreenY(yr + R + bob));
-    ctx.scale(scale, -scale);
+    if (pk) ctx.globalAlpha = pk.alpha;
+    ctx.translate((rw - camX) * scale, toScreenY(yr + R * k + bob) - (pk ? pk.lift * scale : 0));
+    ctx.scale(scale * k, -scale * k);
     ctx.rotate(ang);
     ctx.translate(-0.9, -R);
     const body = [[0.0, 0.42], [0.05, 0.78], [0.25, 0.92], [0.95, 0.96], [1.35, 1.38], [2.95, 1.4], [3.55, 0.98], [4.55, 0.9], [4.8, 0.72], [4.82, 0.38], [4.6, 0.26], [0.2, 0.26]];
     const path = (pts) => { ctx.beginPath(); pts.forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y))); ctx.closePath(); };
     path(body);
-    ctx.fillStyle = '#111316';
+    ctx.fillStyle = o.interceptor ? '#1d2026' : '#111316';
     ctx.fill();
-    // white doors
-    path([[1.25, 0.34], [3.35, 0.34], [3.42, 0.95], [1.18, 0.95]]);
-    ctx.fillStyle = '#eef0f2';
-    ctx.fill();
+    if (o.interceptor) {
+      // unmarked: a sheen along the flank instead of white doors
+      path([[0.3, 0.62], [4.6, 0.66], [4.6, 0.72], [0.3, 0.7]]);
+      ctx.fillStyle = 'rgba(255,255,255,0.12)';
+      ctx.fill();
+    } else {
+      // white doors
+      path([[1.25, 0.34], [3.35, 0.34], [3.42, 0.95], [1.18, 0.95]]);
+      ctx.fillStyle = '#eef0f2';
+      ctx.fill();
+    }
     // windows
     path([[1.45, 1.0], [2.15, 1.0], [2.15, 1.32], [1.48, 1.3]]);
     ctx.fillStyle = '#2a3442'; ctx.fill();
     path([[2.25, 1.0], [3.35, 1.0], [2.9, 1.33], [2.25, 1.33]]);
     ctx.fill();
     // POLICE lettering on the doors
-    ctx.save();
-    ctx.scale(1, -1);
-    ctx.fillStyle = '#111316';
-    ctx.font = `800 0.2px ${FONT}`;
-    ctx.textAlign = 'center';
-    ctx.fillText('POLICE', 2.3, -0.55);
-    ctx.restore();
+    if (!o.interceptor) {
+      ctx.save();
+      ctx.scale(1, -1);
+      ctx.fillStyle = '#111316';
+      ctx.font = `800 0.2px ${FONT}`;
+      ctx.textAlign = 'center';
+      ctx.fillText('POLICE', 2.3, -0.55);
+      ctx.restore();
+    }
     // push bar, lights
     ctx.fillStyle = '#0a0b0d';
     ctx.fillRect(4.78, 0.3, 0.12, 0.42);
     ctx.fillStyle = '#ffe9b8'; ctx.fillRect(4.7, 0.62, 0.12, 0.08);
     ctx.fillStyle = '#d4191f'; ctx.fillRect(-0.02, 0.62, 0.08, 0.12);
-    // light bar: alternating red and blue
+    // light bar: alternating red and blue (in the grille and the screen on the interceptor)
     const phase = Math.floor(t * 8) % 4;
+    const on = p.active !== false;
     const red = phase < 2, blue = !red;
-    ctx.fillStyle = '#1b1c1f'; ctx.fillRect(1.85, 1.4, 0.9, 0.08);
-    ctx.fillStyle = red ? '#ff2b2b' : '#5a1212'; ctx.fillRect(1.88, 1.42, 0.4, 0.1);
-    ctx.fillStyle = blue ? '#2b6bff' : '#10204a'; ctx.fillRect(2.32, 1.42, 0.4, 0.1);
+    if (o.interceptor) {
+      ctx.fillStyle = on && red ? '#ff2b2b' : '#3a1010'; ctx.fillRect(4.62, 0.48, 0.18, 0.06);
+      ctx.fillStyle = on && blue ? '#2b6bff' : '#0e1a3a'; ctx.fillRect(4.62, 0.4, 0.18, 0.06);
+      ctx.fillStyle = on && blue ? '#2b6bff' : '#0e1a3a'; ctx.fillRect(2.9, 1.24, 0.25, 0.05);
+      ctx.fillStyle = on && red ? '#ff2b2b' : '#3a1010'; ctx.fillRect(1.6, 1.22, 0.25, 0.05);
+    } else {
+      ctx.fillStyle = '#1b1c1f'; ctx.fillRect(1.85, 1.4, 0.9, 0.08);
+      ctx.fillStyle = on && red ? '#ff2b2b' : '#5a1212'; ctx.fillRect(1.88, 1.42, 0.4, 0.1);
+      ctx.fillStyle = on && blue ? '#2b6bff' : '#10204a'; ctx.fillRect(2.32, 1.42, 0.4, 0.1);
+    }
     // wheels
     for (const wx of [0.9, 3.9]) {
       ctx.beginPath(); ctx.arc(wx, R, R, 0, TAU); ctx.fillStyle = '#0d0e10'; ctx.fill();
@@ -724,7 +746,111 @@
       const dx = lx - 0.9, dy = ly - R;
       return [(rw + dx * c - dy * s2 - camX) * scale, toScreenY(yr + R + bob + dx * s2 + dy * c)];
     };
-    return { head: toScreen(4.82, 0.66), bar: toScreen(2.3, 1.48), red, angle: -ang };
+    return { head: toScreen(4.82, 0.66), bar: o.interceptor ? toScreen(4.7, 0.48) : toScreen(2.3, 1.48), red, angle: -ang };
+  }
+
+  // A stinger: a folding spike strip lying across the track, its cord
+  // running off to the roadside.
+  function drawStinger(ctx, view, terrain, st, t) {
+    const { scale, camX, toScreenY, w } = view;
+    const sx = (st.x - camX) * scale;
+    if (sx < -60 || sx > w + 60) return;
+    const sy = toScreenY(terrain.surface(st.x));
+    const half = (st.w / 2) * scale, hgt = Math.max(3, 0.05 * scale);
+    // thrown on: it slides into place over a quarter of a second
+    const k = Math.min(1, Math.max(0, (t - st.t) / 0.25));
+    ctx.save();
+    ctx.translate(sx, sy);
+    ctx.globalAlpha = k;
+    ctx.strokeStyle = '#ffb21a';
+    ctx.lineWidth = Math.max(1, scale * 0.012);
+    ctx.beginPath();
+    ctx.moveTo(half, -hgt * 0.4);
+    ctx.quadraticCurveTo(half + scale * 0.4, -hgt * 0.2, half + scale * 0.9, -scale * 0.12);
+    ctx.stroke();
+    ctx.fillStyle = '#2a2b2f';
+    ctx.fillRect(-half, -hgt * 0.55, half * 2, hgt * 0.55);
+    // accordion links, orange and black
+    const n = 7;
+    for (let i = 0; i < n; i++) {
+      const x0 = -half + (i * 2 * half) / n, x1 = -half + ((i + 1) * 2 * half) / n;
+      ctx.fillStyle = i % 2 ? '#1c1d20' : '#ff8a1a';
+      ctx.beginPath();
+      ctx.moveTo(x0, -hgt * 0.5); ctx.lineTo((x0 + x1) / 2, -hgt); ctx.lineTo(x1, -hgt * 0.5); ctx.closePath();
+      ctx.fill();
+    }
+    // spikes
+    ctx.strokeStyle = '#d7dade';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    for (let i = 0; i <= 10; i++) {
+      const x = -half + (i * 2 * half) / 10;
+      ctx.moveTo(x, -hgt * 0.6); ctx.lineTo(x + 1, -hgt * 1.35);
+    }
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  // The police helicopter, hovering ahead with its searchlight on you.
+  // (x, y) is the searchlight in world metres. Returns the lamp's screen
+  // position for lighting.
+  function drawHeli(ctx, view, x, y, tilt, t) {
+    const { scale, camX, toScreenY } = view;
+    const sx = (x - camX) * scale, sy = toScreenY(y);
+    ctx.save();
+    ctx.translate(sx, sy);
+    ctx.scale(scale, scale);
+    ctx.rotate(tilt);
+    // tail boom and fin
+    ctx.fillStyle = '#15171b';
+    ctx.beginPath();
+    ctx.moveTo(-0.6, -0.55); ctx.lineTo(-4.2, -0.75); ctx.lineTo(-4.2, -0.6); ctx.lineTo(-0.6, -0.25);
+    ctx.closePath(); ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(-3.9, -0.7); ctx.lineTo(-4.5, -1.5); ctx.lineTo(-4.25, -1.5); ctx.lineTo(-3.7, -0.7);
+    ctx.closePath(); ctx.fill();
+    // tail rotor blur
+    ctx.strokeStyle = 'rgba(40,44,52,0.5)';
+    ctx.lineWidth = 0.05;
+    ctx.beginPath(); ctx.arc(-4.3, -1.05, 0.45, 0, Math.PI * 2); ctx.stroke();
+    // cabin
+    ctx.fillStyle = '#1b1e24';
+    ctx.beginPath();
+    ctx.ellipse(0.2, -0.45, 1.25, 0.62, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = 'rgba(120,150,180,0.45)';
+    ctx.beginPath();
+    ctx.ellipse(0.85, -0.55, 0.5, 0.36, -0.2, -Math.PI * 0.7, Math.PI * 0.5);
+    ctx.fill();
+    // POLICE band
+    ctx.fillStyle = '#e8eaee';
+    ctx.fillRect(-0.9, -0.42, 1.6, 0.14);
+    // skids
+    ctx.strokeStyle = '#0d0e10';
+    ctx.lineWidth = 0.07;
+    ctx.beginPath();
+    ctx.moveTo(-0.8, 0.32); ctx.lineTo(1.1, 0.32); ctx.quadraticCurveTo(1.35, 0.32, 1.4, 0.2);
+    ctx.moveTo(-0.4, 0.32); ctx.lineTo(-0.3, 0.05); ctx.moveTo(0.7, 0.32); ctx.lineTo(0.6, 0.05);
+    ctx.stroke();
+    // main rotor, a blurred disc seen edge-on, with a flicker of blade
+    ctx.fillStyle = '#0d0e10';
+    ctx.fillRect(0.05, -1.22, 0.15, 0.2);
+    ctx.fillStyle = 'rgba(30,34,40,0.35)';
+    ctx.beginPath(); ctx.ellipse(0.12, -1.24, 4.2, 0.08, 0, 0, Math.PI * 2); ctx.fill();
+    const b = Math.sin(t * 40);
+    ctx.fillStyle = 'rgba(15,17,20,0.85)';
+    ctx.fillRect(0.12 - 4.2 * Math.abs(b), -1.27, 8.4 * Math.abs(b), 0.05);
+    // navigation lights
+    const blink = Math.floor(t * 1.5) % 2 === 0;
+    ctx.fillStyle = blink ? '#ff3030' : '#4a1010';
+    ctx.beginPath(); ctx.arc(-4.4, -1.5, 0.08, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#9cff9c';
+    ctx.beginPath(); ctx.arc(1.3, -0.4, 0.05, 0, Math.PI * 2); ctx.fill();
+    // searchlight pod
+    ctx.fillStyle = '#2a2d33';
+    ctx.beginPath(); ctx.arc(0.9, 0.05, 0.16, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+    return [sx + Math.cos(tilt) * 0.9 * scale, sy + Math.sin(tilt) * 0.9 * scale + 0.05 * scale];
   }
 
   function drawSign(ctx, sx, sy, scale, label) {
@@ -767,5 +893,5 @@
   }
 
   const Sim = root.WheelieSim;
-  root.Render = { FONT, drawSky, drawTrackside, drawGround, drawFlag, drawShadow, drawParticles, drawVignette, drawGauge, drawFeatures, drawObstacles, drawCone, drawPolice, drawPopups };
+  root.Render = { FONT, drawSky, drawTrackside, drawGround, drawFlag, drawShadow, drawParticles, drawVignette, drawGauge, drawFeatures, drawObstacles, drawCone, drawPolice, drawStinger, drawHeli, drawPopups };
 })(typeof self !== 'undefined' ? self : this);
