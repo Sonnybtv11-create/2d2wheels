@@ -69,12 +69,16 @@
 
   const clamp = (v, lo, hi) => (v < lo ? lo : v > hi ? hi : v);
 
-  function deriveHandling(bike) {
+  // `mods` (from Parts.apply) adjusts the stock bike for fitted parts:
+  // gearing (torque), suspension, tyre grip, brakes, how well the
+  // suspension soaks up obstacles, pop strength, perks and ride modes.
+  function deriveHandling(bike, mods) {
+    mods = mods || {};
     const mass = bike.weightKg + RIDER_KG;
     const powerToMass = (bike.peakPowerKw * 1000) / mass;
     // Launch acceleration grows with power-to-weight, compressed so the
     // Varg is a handful rather than impossible.
-    const launch = 6 + 2.5 * Math.log(powerToMass / 30);
+    const launch = (6 + 2.5 * Math.log(powerToMass / 30)) * (mods.torque ? Math.pow(mods.torque, 0.6) : 1);
     const vmax = bike.topSpeedKmh / 3.6;
     const vKnee = TUNE.knee * vmax;
     const wheelbase = (bike.look && bike.look.wheelbase) || 1.3;
@@ -89,10 +93,24 @@
       // drive, so big power stays catchable rather than twitchy.
       pitchArm: TUNE.pitchArm * Math.pow(mass / 140, 0.25) * Math.pow(launch / 7, TUNE.powerDamp),
     };
+    // Suspension, grip and brakes, with any fitted parts.
+    const su = mods.susp || {};
+    h.forkK = TUNE.forkK * (su.forkK || 1);
+    h.forkC = TUNE.forkC * (su.forkC || 1);
+    h.forkTravel = TUNE.forkTravel + (su.forkTravel || 0) + (mods.antiBottom ? 0.015 : 0);
+    h.rearK = TUNE.rearK * (su.rearK || 1);
+    h.rearC = TUNE.rearC * (su.rearC || 1);
+    h.rearTravel = TUNE.rearTravel + (su.rearTravel || 0) + (mods.antiBottom ? 0.015 : 0);
+    h.grip = Object.assign({ dry: 1, wet: 1, mud: 1 }, mods.grip);
+    h.brake = mods.brake || 1;
+    h.absorb = mods.absorb || 0;
+    h.pop = mods.pop || 1;
+    h.perks = mods.perks || new Set(['modes']);
+    h.modes = mods.modes || [{ name: 'Sport', power: 1, cap: 0, ramp: 1 }];
     // Static sag with both wheels down (and the rider sat neutral).
     const ff = (G * Math.cos(COM_ANGLE)) / TUNE.frontLever;
-    h.forkSag = ff / TUNE.forkK;
-    h.rearSag = (G - ff) / TUNE.rearK;
+    h.forkSag = ff / h.forkK;
+    h.rearSag = (G - ff) / h.rearK;
     return h;
   }
 
@@ -311,6 +329,7 @@
       throttle: 0, brake: 0, lean: 0, braking: false,
       spin: 0, // rear wheelspin 0..1
       leanIn: 0, popT: 0, // last lean input, time since the last pop
+      mode: '', launchArmed: false, launchT: 0, rev: 0, clutchHeld: false, assist: 0,
       status: 'riding',            // riding | crashed | busted
       cause: '',                   // why the run ended
       inWheelie: false, wheelieStartX: 0, wheelieDist: 0, wheelieTime: 0,
@@ -353,18 +372,45 @@
 
     // Keys are on/off, but throttle and brake ramp, so a tap is a small input
     // and a hold is a big one.
-    s.throttle += clamp((input.throttle ? 1 : 0) - s.throttle, -TUNE.throttleDown * dt, TUNE.throttleUp * dt);
-    s.brake += clamp((input.brake ? 1 : 0) - s.brake, -TUNE.brakeDown * dt, TUNE.brakeUp * dt);
+    const mode = h.modes[(input.mode | 0) % h.modes.length];
+    s.mode = mode.name;
+    const perks = h.perks;
+    // Launch control: hold gas and brake at a standstill to arm it, let go of
+    // the brake to launch. It pins the throttle and holds the front low.
+    if (perks.has('launch')) {
+      if (s.v < 1 && input.throttle && input.brake) s.launchArmed = true;
+      else if (s.launchArmed && !input.brake) { s.launchArmed = false; if (input.throttle) { s.launchT = 2.5; s.events.push({ type: 'launch' }); } }
+      else if (!input.throttle) s.launchArmed = false;
+    }
+    if (s.launchT > 0) s.launchT -= dt;
+    const launching = s.launchT > 0 && input.throttle;
+    s.throttle += clamp((input.throttle ? 1 : 0) - s.throttle, -TUNE.throttleDown * dt, (launching ? 40 : TUNE.throttleUp * mode.ramp) * dt);
+    s.brake += clamp((input.brake && !s.launchArmed ? 1 : 0) - s.brake, -TUNE.brakeDown * dt, TUNE.brakeUp * dt);
+    if (s.launchArmed) { s.brake = 0; s.v = 0; }
     s.lean += clamp((input.lean || 0) - s.lean, -TUNE.leanRate * dt, TUNE.leanRate * dt);
     s.braking = s.brake > 0.3;
 
     const R = h.wheelRadius, WB = h.wheelbase;
+    // E-Clutch: hold it and the motor spins up without driving the wheel;
+    // let go and it bites, kicking the front up like a clutch-up wheelie.
+    const clutchIn = perks.has('clutch') && !!input.clutch;
+    if (clutchIn) {
+      s.rev = clamp((s.rev || 0) + (input.throttle ? 1.8 : -2) * dt, 0, 1);
+    } else if (s.clutchHeld) {
+      if (s.rev > 0.15 && s.cr > 0) {
+        s.omega += TUNE.pop * 1.5 * s.rev * h.pop * Math.sqrt(3 / h.pitchArm);
+        s.throttle = Math.max(s.throttle, s.rev);
+        s.events.push({ type: 'clutch', rev: s.rev });
+      }
+      s.rev = 0;
+    }
+    s.clutchHeld = clutchIn;
     // The pop (see TUNE.pop).
     const leanIn = input.lean || 0;
     s.popT += dt;
     if (leanIn > 0.5 && s.leanIn <= 0 && input.throttle && s.cr > 0 && s.theta < TUNE.popMaxAngle && s.popT > TUNE.popCooldown) {
       const preload = s.cf > 0 ? clamp((s.cf - h.forkSag) / 0.1, 0, 1) : 0;
-      s.omega += (TUNE.pop + TUNE.popPreload * preload) * Math.sqrt(3 / h.pitchArm);
+      s.omega += (TUNE.pop + TUNE.popPreload * preload) * h.pop * Math.sqrt(3 / h.pitchArm);
       s.popT = 0;
       s.events.push({ type: 'pop', preload });
     }
@@ -401,8 +447,8 @@
       const f = k * Math.min(c, travel * 1.05) + clamp(d * rate, -3 * G, 3.5 * G);
       return Math.max(0, f);
     };
-    const Fr = spring(s.cr, crRate, TUNE.rearK, TUNE.rearC, TUNE.rearTravel);
-    const Ff = spring(s.cf, cfRate, TUNE.forkK, TUNE.forkC, TUNE.forkTravel);
+    const Fr = spring(s.cr, crRate, h.rearK, h.rearC, h.rearTravel);
+    const Ff = spring(s.cf, cfRate, h.forkK, h.forkC, h.forkTravel);
 
     s.rearLoad += (Fr / G - s.rearLoad) * Math.min(1, dt * 30);
     s.frontLoad = Ff / G;
@@ -414,16 +460,42 @@
     const mud = terrain.mudAt(s.x);
     const puddle = env.wet > 0 && terrain.puddleAt(s.x);
     s.inMud = mud; s.inPuddle = puddle;
-    const mu = puddle ? 0.45 : 1 - 0.25 * env.wet;
+    // Grip: the tyre's dry grip, less in the wet (less again for tyres that
+    // don't clear water), least in a puddle.
+    const mu = h.grip.dry * (puddle ? 0.45 * h.grip.wet : 1 - (0.25 * env.wet) / h.grip.wet);
     const moving = s.v > 0.01;
-    const want = s.throttle * driveAt(h, s.v);
+    let want = s.throttle * driveAt(h, s.v) * mode.power;
+    if (mode.cap && s.v > mode.cap / 3.6) want *= clamp(1 - (s.v - mode.cap / 3.6) / 1.5, 0, 1);
+    if (clutchIn || s.launchArmed) want = 0;
     const gripLimit = rearDown ? mu * TUNE.grip * G * clamp(s.rearLoad, 0, 1.8) : 0;
-    const drive = Math.min(want, gripLimit);
-    s.spin += ((want > gripLimit + 0.3 && rearDown ? 1 : 0) - s.spin) * Math.min(1, dt * 8);
-    const brakeMax = s.frontDown ? TUNE.bothBrakes : TUNE.rearBrake;
+    const spinning = want > gripLimit + 0.3 && rearDown;
+    // A spinning tyre pushes less than one at the limit of grip. Traction
+    // control (and launch control) holds it at the limit instead.
+    const tc = perks.has('traction') || launching;
+    let drive = spinning ? gripLimit * (tc ? 0.98 : 0.85) : Math.min(want, gripLimit);
+    let assistBrake = 0;
+    // Anti-loop: past the balance point the power fades out. During a launch
+    // it holds the front low instead.
+    // It looks a little ahead (pitch rate), like the real IMU-based systems,
+    // so a fast-rising front is caught before it gets there.
+    if (((perks.has('antiLoop') && !input.assistOff) || launching) && !s.frontDown && rearDown) {
+      const limit = balanceAngle(s, h) - (launching ? 18 : 8) * DEG;
+      const ahead = s.theta + Math.max(0, s.omega) * 0.3;
+      if (ahead > limit) {
+        drive *= clamp(1 - (ahead - limit) / (5 * DEG), 0, 1);
+        // past the cut, it drags the motor like a dab of rear brake
+        assistBrake = clamp((ahead - limit - 3 * DEG) / (6 * DEG), 0, 1) * TUNE.rearBrake * 0.7;
+        s.assist = 0.3;
+      }
+    }
+    if (s.assist > 0) s.assist -= dt;
+    s.spin += ((spinning && !tc ? 1 : 0) - s.spin) * Math.min(1, dt * 8);
+    const brakeMax = (s.frontDown ? TUNE.bothBrakes : TUNE.rearBrake) * h.brake;
     const brakeGrip = s.frontDown ? mu * TUNE.grip * G : gripLimit;
-    const brake = moving ? Math.min(s.brake * brakeMax, brakeGrip) * (s.airborne ? 0 : 1) : 0;
-    const roll = moving && !s.airborne ? TUNE.roll * (mud ? TUNE.mudRoll : 1) * (s.frontDown ? 1 : 0.6) + (puddle ? 0.4 : 0) : 0;
+    // Regen: rolling off slows the rear wheel like a light brake.
+    const regen = perks.has('regen') && !clutchIn && s.throttle < 0.15 && rearDown && s.v > 2 ? 1.6 * (1 - s.throttle / 0.15) : 0;
+    const brake = moving ? Math.min(s.brake * brakeMax + regen + assistBrake, Math.max(brakeGrip, regen)) * (s.airborne ? 0 : 1) : 0;
+    const roll = moving && !s.airborne ? TUNE.roll * (mud ? TUNE.mudRoll / h.grip.mud : 1) * (s.frontDown ? 1 : 0.6) + (puddle ? 0.4 : 0) : 0;
     s.wind = env.wind(s.time);
     const air = s.v + s.wind;
     s.inWheelie = !s.frontDown && rearDown && s.theta > WHEELIE_START;
@@ -448,10 +520,10 @@
       // Inelastic, so a hard hit is absorbed rather than bounced.
       const gR = terrain.wheelY(s.x, R) - terrain.base(s.x);
       const c = h.rearSag + gR - s.yq;
-      if (c > TUNE.rearTravel) {
+      if (c > h.rearTravel) {
         const rise = (gR - (groundR - baseR)) / dt;
         if (s.vy < rise - 1.5) s.events.push({ type: 'bottom', end: 'rear', strength: rise - s.vy });
-        s.yq = h.rearSag + gR - TUNE.rearTravel;
+        s.yq = h.rearSag + gR - h.rearTravel;
         s.vy = Math.max(s.vy, Math.min(rise, 2.5));
       }
     }
@@ -482,9 +554,9 @@
       const p2 = s.theta + slope;
       const gF = terrain.wheelY(s.x + WB * Math.cos(p2), R);
       const c = h.forkSag + gF - (terrain.base(s.x) + s.yq + WB * Math.sin(p2));
-      if (c > TUNE.forkTravel) {
+      if (c > h.forkTravel) {
         if (s.omega < -0.6) s.events.push({ type: 'bottom', end: 'front', strength: -s.omega * WB });
-        s.theta += (c - TUNE.forkTravel) / (WB * Math.max(0.3, Math.cos(p2)));
+        s.theta += (c - h.forkTravel) / (WB * Math.max(0.3, Math.cos(p2)));
         s.omega = Math.max(s.omega, 0);
       }
     }
@@ -510,16 +582,16 @@
             return;
           }
           // climbing it with the front wheel costs speed
-          s.v *= 1 - clamp(o.h * 0.6, 0, 0.18);
-          s.events.push({ type: 'impact', obstacle: o, strength: o.h * s.v * 0.4, end: 'front' });
+          s.v *= 1 - clamp(o.h * 0.6, 0, 0.18) * (1 - h.absorb);
+          s.events.push({ type: 'impact', obstacle: o, strength: o.h * s.v * 0.4 * (1 - h.absorb), end: 'front' });
         } else {
           s.events.push({ type: 'clear', obstacle: o });
         }
       }
       if (!o.soft && !s.hitRear.has(o) && Math.abs(s.x - o.x) < o.w / 2 + R * 0.35) {
         s.hitRear.add(o);
-        s.v *= 1 - clamp(o.h * 0.2, 0, 0.08);
-        s.events.push({ type: 'impact', obstacle: o, strength: o.h * s.v * 0.3, end: 'rear' });
+        s.v *= 1 - clamp(o.h * 0.2, 0, 0.08) * (1 - h.absorb);
+        s.events.push({ type: 'impact', obstacle: o, strength: o.h * s.v * 0.3 * (1 - h.absorb), end: 'rear' });
       }
     }
 
@@ -651,8 +723,8 @@
   // sag position, towards the chassis (positive) or away (negative).
   function wheelOffsets(s, h) {
     return {
-      rear: Math.max(0, Math.min(s.cr, TUNE.rearTravel + 0.02)) - h.rearSag,
-      front: (s.cf > 0 ? Math.min(s.cf, TUNE.forkTravel + 0.02) : 0) - h.forkSag,
+      rear: Math.max(0, Math.min(s.cr, h.rearTravel + 0.02)) - h.rearSag,
+      front: (s.cf > 0 ? Math.min(s.cf, h.forkTravel + 0.02) : 0) - h.forkSag,
     };
   }
 

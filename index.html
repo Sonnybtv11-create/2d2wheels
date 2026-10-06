@@ -27,6 +27,7 @@
       <div id="hud-wind" class="hud-sub hud-wind"><span id="wind-arrow" class="wind-arrow" aria-hidden="true">➜</span> <span id="wind-text">calm</span></div>
       <div id="hud-cond" class="hud-sub hud-bike"></div>
       <div id="hud-bike" class="hud-sub hud-bike"></div>
+      <div id="hud-mode" class="hud-mode"></div>
     </div>
     <div id="hud-hint" class="hud-hint"></div>
     <div id="hud-toast" class="hud-toast" aria-live="polite"></div>
@@ -44,6 +45,11 @@
     <div class="touch-group">
       <button class="touch-btn" type="button" data-key="brake"><span>Brake</span></button>
       <button class="touch-btn" type="button" data-key="leanBack"><span>◀ Lean</span></button>
+    </div>
+    <div class="touch-group touch-mini">
+      <button id="touch-mode" class="touch-btn mini" type="button" data-tap="mode"><span>Mode</span></button>
+      <button id="touch-assist" class="touch-btn mini" type="button" hidden><span>Assist</span></button>
+      <button id="touch-clutch" class="touch-btn mini" type="button" data-key="clutch" hidden><span>Clutch</span></button>
     </div>
     <div class="touch-group">
       <button class="touch-btn" type="button" data-key="leanFwd"><span>Lean ▶</span></button>
@@ -65,20 +71,32 @@
       </div>
 
       <div class="info">
-        <div class="meta">
-          <span id="bike-num" class="plate-num">1</span>
-          <span id="bike-diff" class="diff">Easy</span>
-          <span id="bike-maker" class="maker"></span>
+        <div class="tabs" role="tablist" aria-label="Garage">
+          <button id="tab-ride" class="tab" type="button" role="tab" aria-selected="true" aria-controls="pane-ride">Ride</button>
+          <button id="tab-shop" class="tab" type="button" role="tab" aria-selected="false" aria-controls="pane-shop">Workshop</button>
+          <span class="bank" title="Points to spend in the workshop"><b id="bank">0</b> pts</span>
         </div>
-        <h2 id="bike-name"></h2>
-        <p id="bike-blurb" class="blurb"></p>
-        <div id="specs" class="specs"></div>
-        <div class="best-row"><span>Your best</span><b id="bike-best">No run yet</b></div>
-        <div class="conds">
-          <div class="cond"><span class="cond-label" id="lbl-time">Time</span><div class="seg" id="seg-time" role="radiogroup" aria-labelledby="lbl-time"></div></div>
-          <div class="cond"><span class="cond-label" id="lbl-weather">Weather</span><div class="seg" id="seg-weather" role="radiogroup" aria-labelledby="lbl-weather"></div></div>
-          <div class="cond"><span class="cond-label" id="lbl-wanted">Wanted</span><div class="seg seg-stars" id="seg-wanted" role="radiogroup" aria-labelledby="lbl-wanted"></div></div>
-          <p class="wanted-desc" id="wanted-desc"></p>
+        <div id="pane-ride" class="pane" role="tabpanel" aria-labelledby="tab-ride">
+          <div class="meta">
+            <span id="bike-num" class="plate-num">1</span>
+            <span id="bike-diff" class="diff">Easy</span>
+            <span id="bike-maker" class="maker"></span>
+          </div>
+          <h2 id="bike-name"></h2>
+          <p id="bike-blurb" class="blurb"></p>
+          <div id="specs" class="specs"></div>
+          <div class="best-row"><span>Your best</span><b id="bike-best">No run yet</b></div>
+          <div class="conds">
+            <div class="cond"><span class="cond-label" id="lbl-time">Time</span><div class="seg" id="seg-time" role="radiogroup" aria-labelledby="lbl-time"></div></div>
+            <div class="cond"><span class="cond-label" id="lbl-weather">Weather</span><div class="seg" id="seg-weather" role="radiogroup" aria-labelledby="lbl-weather"></div></div>
+            <div class="cond"><span class="cond-label" id="lbl-wanted">Wanted</span><div class="seg seg-stars" id="seg-wanted" role="radiogroup" aria-labelledby="lbl-wanted"></div></div>
+            <p class="wanted-desc" id="wanted-desc"></p>
+          </div>
+        </div>
+        <div id="pane-shop" class="pane" role="tabpanel" aria-labelledby="tab-shop" hidden>
+          <div id="build-sum" class="build-sum"></div>
+          <div id="slots" class="slots"></div>
+          <p class="fine">Real parts. Prices are about 10 points per US dollar. Figures from the makers and retailers; where one wasn't published, the part notes the estimate.</p>
         </div>
         <button id="btn-start" class="ride" type="button">Ride <span class="kbd">Enter</span></button>
         <p id="bike-sources" class="sources"></p>
@@ -91,6 +109,8 @@
         <span><span class="kbd">↓</span><span class="kbd">S</span> Rear brake</span>
         <span><span class="kbd">←</span><span class="kbd">A</span> Lean back</span>
         <span><span class="kbd">→</span><span class="kbd">D</span> Lean forward</span>
+        <span><span class="kbd">Q</span> Ride mode</span>
+        <span><span class="kbd">Shift</span> E-Clutch · <span class="kbd">E</span> Anti-loop (if fitted)</span>
         <span>Snap back on the gas to pop the front over obstacles. Wheelie to outrun the police: you're faster on one wheel. Sit just under the balance point for double points.</span>
         <span class="fine">Specs from manufacturer and retailer listings; physics simplified. A fan game, not affiliated with these brands.</span>
       </footer>
@@ -109,15 +129,18 @@
         <div><dt>Top speed</dt><dd id="res-speed">0 km/h</dd></div>
         <div><dt>Points to spend</dt><dd id="res-bank">0</dd></div>
       </dl>
+      <p id="res-shop" class="res-shop"></p>
       <div class="slip-actions">
         <button id="btn-retry" class="ride" type="button">Again <span class="kbd">R</span></button>
         <button id="btn-change" class="ghost" type="button">Garage <span class="kbd">Esc</span></button>
+        <button id="btn-shop" class="ghost" type="button">Workshop</button>
       </div>
     </div>
   </section>
 
   <script src="js/bikes.js"></script>
   <script src="js/physics.js"></script>
+  <script src="js/parts.js"></script>
   <script src="js/traced/surron-lbx.js"></script>
   <script src="js/traced/stark-varg-mx.js"></script>
   <script src="js/bikeart.js"></script>

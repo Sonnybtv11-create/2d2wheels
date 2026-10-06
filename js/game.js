@@ -2,6 +2,7 @@
   'use strict';
 
   const Sim = window.WheelieSim;
+  const Parts = window.Parts;
   const R = window.Render;
   const Art = window.BikeArt;
   const Atmo = window.Atmo;
@@ -78,7 +79,11 @@
   let heli = null;      // the four- and five-star helicopter
   let wantedMult = 1;
   const demo = { up: true, t: 0 };
-  const keys = { throttle: false, brake: false, leanBack: false, leanFwd: false };
+  const keys = { throttle: false, brake: false, leanBack: false, leanFwd: false, clutch: false };
+  let build = null;     // the fitted parts for this run (Parts.apply)
+  let modeIdx = 0;      // ride mode
+  let assistOff = false; // anti-loop switched off
+  let hudModeHtml = '';
 
   const bestScore = (id) => store.get('hi.' + id, 0);
   const bestDist = (id) => store.get('far.' + id, 0);
@@ -116,14 +121,21 @@
     chip.addEventListener('click', () => selectBike(i));
     chip.addEventListener('dblclick', () => { selectBike(i); startRun(); });
     list.appendChild(chip);
-    const c = chip.querySelector('canvas').getContext('2d');
-    const s = 240 / 2.15;
-    c.save();
-    c.translate(120 - (b.look.wheelbase / 2) * s, 112);
-    c.scale(s, -s);
-    Art.drawBike(c, b.id, { rider: false, spin: 0.4 });
-    c.restore();
   });
+  // The bike chips, drawn with each bike's current build.
+  function drawChips() {
+    BIKES.forEach((b, i) => {
+      const c = list.children[i].querySelector('canvas').getContext('2d');
+      const s = 240 / 2.6;
+      c.setTransform(1, 0, 0, 1, 0, 0);
+      c.clearRect(0, 0, 240, 120);
+      c.save();
+      c.translate(120 - (b.look.wheelbase / 2) * s, 112);
+      c.scale(s, -s);
+      Art.drawBike(c, b.id, { rider: false, spin: 0.4, style: Parts.apply(b, buildOf(b.id)).style });
+      c.restore();
+    });
+  }
 
   // Conditions pickers: two rows of segmented buttons.
   function buildSeg(el, options, get, set) {
@@ -165,14 +177,211 @@
     $('bike-maker').textContent = b.maker;
     $('bike-name').textContent = b.name;
     $('bike-blurb').textContent = b.blurb;
+    const sp = Parts.apply(b, buildOf(b.id)).spec;
+    const built = sp.peakPowerKw !== b.peakPowerKw || sp.topSpeedKmh !== b.topSpeedKmh || sp.weightKg !== b.weightKg;
     $('specs').innerHTML =
-      specRow('Peak power', `${b.peakPowerKw} kW`, Math.log(b.peakPowerKw * 1.33) / SPEC_MAX.power) +
-      specRow('Weight', `${b.weightKg} kg`, b.weightKg / SPEC_MAX.weight) +
-      specRow('Top speed', `${b.topSpeedKmh} km/h`, b.topSpeedKmh / SPEC_MAX.speed) +
-      `<div class="spec-extra">${b.extra}</div>`;
+      specRow('Peak power', `${sp.peakPowerKw} kW`, Math.min(1, Math.log(sp.peakPowerKw * 1.33) / SPEC_MAX.power)) +
+      specRow('Weight', `${+sp.weightKg.toFixed(1)} kg`, sp.weightKg / SPEC_MAX.weight) +
+      specRow('Top speed', `${sp.topSpeedKmh} km/h`, Math.min(1, sp.topSpeedKmh / SPEC_MAX.speed)) +
+      `<div class="spec-extra">${b.extra}${built ? ' · <b>with your parts</b>' : ''}</div>`;
+    $('bank').textContent = fmt(store.get('bank', 0));
+    if (tab === 'shop') renderShop();
     const bsc = bestScore(b.id);
     $('bike-best').textContent = bsc > 0 ? `${fmt(bsc)} pts · ${fmt(bestDist(b.id))} m` : 'No run yet';
     $('bike-sources').innerHTML = 'Specs: ' + b.sources.map((u) => `<a href="${u}" target="_blank" rel="noopener">${new URL(u).hostname.replace(/^www\./, '')}</a>`).join(' · ');
+  }
+
+  /* ---------- workshop ---------- */
+  // Builds, owned parts and the points bank live in localStorage:
+  //   build.<bike>  { slot: itemId, 'slot:v': variant }
+  //   owned         { 'bike/slot/item': true }
+  //   bank          points to spend
+  const buildOf = (id) => store.get('build.' + id, {});
+  const ownedMap = () => store.get('owned', {});
+  let shopSlot = null;  // the expanded slot
+  let preview = null;   // { slot, item, v } under the pointer
+  let tab = store.get('tab', 'ride') === 'shop' ? 'shop' : 'ride';
+
+  function appliedFor(b, override) {
+    const build = Object.assign({}, buildOf(b.id));
+    if (override) { build[override.slot] = override.item; build[override.slot + ':v'] = override.v | 0; }
+    return Parts.apply(b, build);
+  }
+
+  function setTab(t) {
+    tab = t;
+    store.set('tab', t);
+    $('tab-ride').setAttribute('aria-selected', String(t === 'ride'));
+    $('tab-shop').setAttribute('aria-selected', String(t === 'shop'));
+    show('pane-ride', t === 'ride');
+    show('pane-shop', t === 'shop');
+    if (t === 'shop') renderShop();
+  }
+  $('tab-ride').addEventListener('click', () => setTab('ride'));
+  $('tab-shop').addEventListener('click', () => setTab('shop'));
+
+  const pct = (x) => `${x > 0 ? '+' : ''}${Math.round(x * 100)}%`;
+  // What swapping to `b` (a build) changes from `a`, in a few short lines.
+  function effects(a, b) {
+    const out = [];
+    const num = (label, x, y, unit, better, dp = 0) => {
+      if (Math.abs(x - y) < (dp ? 0.05 : 0.5)) return;
+      out.push({ t: `${label} ${x.toFixed(dp)} → ${y.toFixed(dp)} ${unit}`, up: better(y, x) });
+    };
+    const rel = (label, x, y, better = 1) => { if (Math.abs(y / x - 1) >= 0.01) out.push({ t: `${label} ${pct(y / x - 1)}`, up: (y > x) === (better > 0) }); };
+    num('Power', a.spec.peakPowerKw, b.spec.peakPowerKw, 'kW', (p, q) => p > q, 1);
+    num('Top speed', a.spec.topSpeedKmh, b.spec.topSpeedKmh, 'km/h', (p, q) => p > q);
+    num('Weight', a.spec.weightKg, b.spec.weightKg, 'kg', (p, q) => p < q, 1);
+    rel('Pull', a.mods.torque, b.mods.torque);
+    for (const [k, l] of [['dry', 'Grip'], ['wet', 'Wet grip'], ['mud', 'Mud']]) rel(l, a.mods.grip[k], b.mods.grip[k]);
+    rel('Brakes', a.mods.brake, b.mods.brake);
+    rel('Pop', a.mods.pop, b.mods.pop);
+    const damp = (m) => ((m.susp.forkC || 1) + (m.susp.rearC || 1)) / 2;
+    rel('Damping', damp(a.mods), damp(b.mods));
+    if (Math.abs(a.mods.absorb - b.mods.absorb) > 0.005) out.push({ t: `Soaks up hits ${pct(b.mods.absorb - a.mods.absorb)}`, up: b.mods.absorb > a.mods.absorb });
+    const len = (L) => (L ? L.len : 0);
+    if (len(a.light) !== len(b.light)) out.push({ t: b.light ? `Beam ${len(a.light)} → ${len(b.light)} m` : 'No lights', up: len(b.light) > len(a.light) });
+    for (const p of b.perks) if (!a.perks.has(p)) out.push({ t: `+ ${Parts.PERKS[p].label}`, up: true });
+    for (const p of a.perks) if (!b.perks.has(p)) out.push({ t: `− ${Parts.PERKS[p].label}`, up: false });
+    return out;
+  }
+
+  // Why a part can't deliver its full power: the weakest of controller,
+  // motor and battery.
+  function powerNote(b, cand, it) {
+    if (!it.kw || cand.spec.peakPowerKw >= it.kw) return '';
+    for (const sid of ['controller', 'motor', 'battery']) {
+      const f = cand.fitted[sid];
+      if (f && f.kw === cand.spec.peakPowerKw) return `Held to ${cand.spec.peakPowerKw} kW by the ${f.name}.`;
+    }
+    return '';
+  }
+
+  function renderShop() {
+    const b = BIKES[bikeIndex];
+    const build = buildOf(b.id);
+    const cur = Parts.apply(b, build);
+    const stock = Parts.apply(b, {});
+    const own = ownedMap();
+    const bank = store.get('bank', 0);
+    $('bank').textContent = fmt(bank);
+    const stat = (label, v, unit, s0) => `<div class="stat"><span>${label}</span><b>${v}</b><small>${unit}${s0 !== v ? ` · stock ${s0}` : ''}</small></div>`;
+    $('build-sum').innerHTML =
+      stat('Power', cur.spec.peakPowerKw, 'kW', stock.spec.peakPowerKw) +
+      stat('Top speed', cur.spec.topSpeedKmh, 'km/h', stock.spec.topSpeedKmh) +
+      stat('Weight', +cur.spec.weightKg.toFixed(1), 'kg', stock.spec.weightKg) +
+      `<div class="perkline">${[...cur.perks].map((p) => `<span class="perk" title="${Parts.PERKS[p].text}">${Parts.PERKS[p].label}${Parts.PERKS[p].key ? ` · ${Parts.PERKS[p].key}` : ''}</span>`).join('')}</div>`;
+    const box = $('slots');
+    box.innerHTML = '';
+    for (const slot of Parts.slotsFor(b.id)) {
+      const fit = cur.fitted[slot.id];
+      const vi = build[slot.id + ':v'] | 0;
+      const row = document.createElement('button');
+      row.type = 'button';
+      row.className = 'slot-row' + (fit.id !== 'stock' ? ' upgraded' : '');
+      row.setAttribute('aria-expanded', String(shopSlot === slot.id));
+      row.innerHTML = `<span class="slot-label">${slot.label}</span><span class="slot-fit">${fit.name}${fit.variants ? ` · ${fit.variants[vi].label}` : ''}</span><span class="chev" aria-hidden="true">›</span>`;
+      row.addEventListener('click', () => { shopSlot = shopSlot === slot.id ? null : slot.id; renderShop(); });
+      box.appendChild(row);
+      if (shopSlot !== slot.id) continue;
+      const listEl = document.createElement('div');
+      listEl.className = 'part-list';
+      listEl.addEventListener('pointerleave', () => { preview = null; });
+      for (const it of slot.items) {
+        const isFit = fit.id === it.id;
+        const has = Parts.owned(own, b.id, slot.id, it.id);
+        const cand = Parts.apply(b, Object.assign({}, build, { [slot.id]: it.id }));
+        const fx = isFit ? [] : effects(cur, cand);
+        const card = document.createElement('div');
+        card.className = 'part' + (isFit ? ' fitted' : '');
+        const price = isFit ? '<span class="price owned">Fitted</span>' : has ? '<span class="price owned">Owned</span>' : `<span class="price">${fmt(it.price)} pts</span>`;
+        const perks = (it.perks || []).filter((p) => p !== 'modes' || !stock.perks.has('modes')).map((p) => `<span class="perk" title="${Parts.PERKS[p].text}">${Parts.PERKS[p].label}</span>`).join('');
+        const pn = powerNote(b, cand, it);
+        card.innerHTML =
+          `<div class="part-head"><b>${it.name}</b><span class="maker">${it.maker}${it.usd ? ` · about $${fmt(it.usd)}` : ''}</span>${price}</div>` +
+          `<div class="part-specs">${it.specs || ''}</div>` +
+          (it.text ? `<div class="part-text">${it.text}</div>` : '') +
+          (perks ? `<div class="part-fx">${perks}</div>` : '') +
+          (fx.length ? `<div class="part-fx">${fx.map((f) => `<span class="${f.up ? 'up' : 'down'}">${f.t}</span>`).join('')}</div>` : (!isFit && !perks ? '<div class="part-fx"><span>Looks only</span></div>' : '')) +
+          (pn ? `<div class="note">${pn}</div>` : '') +
+          (it.note ? `<div class="note">${it.note}</div>` : '') +
+          `<div class="part-foot"></div>`;
+        const foot = card.querySelector('.part-foot');
+        const act = document.createElement('button');
+        act.type = 'button';
+        act.className = 'part-act';
+        if (isFit) { act.textContent = 'Fitted'; act.disabled = true; }
+        else if (has) { act.textContent = 'Fit'; act.addEventListener('click', () => fitPart(b, slot.id, it.id, 0)); }
+        else if (bank >= it.price) { act.textContent = 'Buy & fit'; act.classList.add('buy'); act.addEventListener('click', () => buyPart(b, slot, it)); }
+        else { act.textContent = `Need ${fmt(it.price - bank)} more`; act.disabled = true; }
+        foot.appendChild(act);
+        if (it.variants) {
+          const sw = document.createElement('div');
+          sw.className = 'swatches';
+          it.variants.forEach((v, k) => {
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'swatch';
+            btn.title = v.label;
+            btn.setAttribute('aria-label', `${it.name}: ${v.label}`);
+            btn.setAttribute('aria-pressed', String(isFit && vi === k));
+            btn.style.background = swatchColour(v.style);
+            btn.addEventListener('pointerenter', () => { preview = { slot: slot.id, item: it.id, v: k }; });
+            btn.addEventListener('click', () => { if (has) fitPart(b, slot.id, it.id, k); else preview = { slot: slot.id, item: it.id, v: k }; });
+            sw.appendChild(btn);
+          });
+          foot.appendChild(sw);
+        }
+        if (it.src && it.src.length) {
+          const a = document.createElement('a');
+          a.href = it.src[0]; a.target = '_blank'; a.rel = 'noopener';
+          a.textContent = new URL(it.src[0]).hostname.replace(/^www\./, '');
+          foot.appendChild(a);
+        }
+        card.addEventListener('pointerenter', () => { preview = { slot: slot.id, item: it.id, v: isFit ? vi : 0 }; });
+        card.addEventListener('focusin', () => { preview = { slot: slot.id, item: it.id, v: isFit ? vi : 0 }; });
+        listEl.appendChild(card);
+      }
+      box.appendChild(listEl);
+    }
+  }
+
+  // The colour a variant shows off, for its swatch.
+  function swatchColour(st) {
+    for (const k of ['rim', 'paint', 'controller', 'fork', 'light', 'shock']) {
+      const v = st[k];
+      if (!v) continue;
+      if (typeof v === 'string') return v;
+      return v.c || v.upper || v.back || v.spring || (v.ramp && v.ramp[1]) || '#888';
+    }
+    return '#888';
+  }
+
+  function fitPart(b, slotId, itemId, v) {
+    const build = buildOf(b.id);
+    build[slotId] = itemId;
+    build[slotId + ':v'] = v | 0;
+    store.set('build.' + b.id, build);
+    preview = null;
+    afterBuildChange();
+  }
+
+  function buyPart(b, slot, it) {
+    const bank = store.get('bank', 0);
+    if (bank < it.price) return;
+    store.set('bank', bank - it.price);
+    const own = ownedMap();
+    own[`${b.id}/${slot.id}/${it.id}`] = true;
+    store.set('owned', own);
+    audio.unlock();
+    audio.chime(true);
+    fitPart(b, slot.id, it.id, 0);
+  }
+
+  function afterBuildChange() {
+    drawChips();
+    refreshMenu();
+    if (mode === 'menu') newRun(false);
   }
 
   function selectBike(i) {
@@ -252,14 +461,18 @@
     sctx.rotate(p);
     sctx.translate(0, -wr);
     const front = reduce ? 0 : (dip + land) * 0.07 - (lift > 0.3 ? 0.04 : 0);
-    Art.drawBike(sctx, b.id, { lean: lift * 0.8 - dip * 0.6, spin: reduce ? 0 : stageT * 3, pitch: p, frontOff: front, rearOff: reduce ? 0 : lift * 0.03 });
+    const look = appliedFor(b, preview).style;
+    Art.drawBike(sctx, b.id, { lean: lift * 0.8 - dip * 0.6, spin: reduce ? 0 : stageT * 3, pitch: p, frontOff: front, rearOff: reduce ? 0 : lift * 0.03, style: look, lit: true });
     sctx.restore();
   }
 
   /* ---------- runs ---------- */
   function newRun(play) {
     bike = BIKES[bikeIndex];
-    handling = Sim.deriveHandling(bike);
+    build = Parts.apply(bike, buildOf(bike.id));
+    handling = Sim.deriveHandling(build.spec, Object.assign({}, build.mods, { perks: build.perks, modes: build.modes }));
+    modeIdx = 0;
+    assistOff = false;
     const seed = (Math.random() * 1e9) | 0;
     terrain = Sim.createTerrain(seed);
     weatherKind = condWeather === 'random' ? pickWeather() : condWeather;
@@ -293,6 +506,10 @@
     $('hud-bike').textContent = bike.name;
     $('hud-best').textContent = `Best ${fmt(bestScore(bike.id))}`;
     hint(isTouch ? 'Hold Gas, tap ◀ Lean to pop the front' : 'Hold ↑, tap ← to pop the front', 2.8);
+    if (build.perks.has('launch')) setTimeout(() => { if (mode === 'play' && sim.time < 3) hint(isTouch ? 'Launch control: hold Gas and Brake, let go of Brake' : 'Launch control: hold ↑ and ↓, let go of ↓', 2.6); }, 2900);
+    $('touch-clutch').hidden = !build.perks.has('clutch');
+    $('touch-mode').hidden = build.modes.length < 2;
+    $('touch-assist').hidden = !build.perks.has('antiLoop');
     for (const k in keys) keys[k] = false;
     audio.unlock();
   }
@@ -314,6 +531,13 @@
     $('res-clears').textContent = String(stats.clears) + (stats.closeCalls ? ` · ${stats.closeCalls} close call${stats.closeCalls > 1 ? 's' : ''}` : '');
     $('res-speed').textContent = `${Math.round(stats.topSpeed * 3.6)} km/h`;
     $('res-bank').textContent = `${fmt(bank)} (+${fmt(run.score)})`;
+    // the next thing the bank can buy for this bike, or the cheapest one to aim for
+    const own = ownedMap(), parts = [];
+    for (const slot of Parts.slotsFor(bike.id)) for (const it of slot.items) if (!Parts.owned(own, bike.id, slot.id, it.id)) parts.push(it);
+    parts.sort((x, y) => y.price - x.price);
+    const can = parts.find((it) => it.price <= bank);
+    const next = parts[parts.length - 1];
+    $('res-shop').innerHTML = can ? `You can buy the <b>${can.name}</b> in the workshop.` : next ? `<b>${fmt(next.price - bank)}</b> more points for the ${next.name}.` : 'You own every part for this bike.';
     const rb = $('res-best');
     rb.textContent = isBest ? (prev > 0 ? `New best, up from ${fmt(prev)}` : 'New best') : `Best ${fmt(prev)}`;
     rb.className = 'res-best' + (isBest ? ' new' : '');
@@ -344,13 +568,28 @@
     ArrowDown: 'brake', KeyS: 'brake',
     ArrowLeft: 'leanBack', KeyA: 'leanBack',
     ArrowRight: 'leanFwd', KeyD: 'leanFwd',
+    ShiftLeft: 'clutch', ShiftRight: 'clutch',
   };
+
+  function toggleAssist() {
+    if (mode !== 'play' || !build || !build.perks.has('antiLoop')) return;
+    assistOff = !assistOff;
+    toast(assistOff ? 'Anti-loop off' : 'Anti-loop on');
+    audio.click();
+  }
+
+  function nextMode() {
+    if (mode !== 'play' || !build || build.modes.length < 2) return;
+    modeIdx = (modeIdx + 1) % build.modes.length;
+    toast(build.modes[modeIdx].name);
+    audio.click();
+  }
 
   window.addEventListener('keydown', (e) => {
     audio.unlock();
     if (e.code === 'KeyM') { audio.toggle(); return; }
     if (mode === 'menu') {
-      if (e.target && e.target.closest && e.target.closest('.seg')) return; // let the pickers have their keys
+      if (e.target && e.target.closest && e.target.closest('.seg, .pane, .tabs')) return; // let the pickers and the workshop have their keys
       if (e.code === 'ArrowLeft' || e.code === 'ArrowUp') { selectBike(bikeIndex - 1); e.preventDefault(); }
       else if (e.code === 'ArrowRight' || e.code === 'ArrowDown') { selectBike(bikeIndex + 1); e.preventDefault(); }
       else if (e.code === 'Enter') { startRun(); e.preventDefault(); }
@@ -362,6 +601,8 @@
       return;
     }
     if (e.code === 'KeyR') { startRun(); return; }
+    if (e.code === 'KeyQ') { if (!e.repeat) nextMode(); return; }
+    if (e.code === 'KeyE') { if (!e.repeat) toggleAssist(); return; }
     const k = KEYMAP[e.code];
     if (k) { keys[k] = true; e.preventDefault(); }
   });
@@ -371,7 +612,9 @@
   });
   window.addEventListener('blur', () => { for (const k in keys) keys[k] = false; });
 
-  document.querySelectorAll('.touch-btn').forEach((btn) => {
+  $('touch-mode').addEventListener('pointerdown', (e) => { e.preventDefault(); nextMode(); });
+  $('touch-assist').addEventListener('pointerdown', (e) => { e.preventDefault(); toggleAssist(); });
+  document.querySelectorAll('.touch-btn[data-key]').forEach((btn) => {
     const k = btn.dataset.key;
     const on = (e) => { e.preventDefault(); btn.setPointerCapture(e.pointerId); keys[k] = true; btn.classList.add('active'); audio.unlock(); };
     const off = () => { keys[k] = false; btn.classList.remove('active'); };
@@ -385,6 +628,7 @@
   $('btn-start').addEventListener('click', startRun);
   $('btn-retry').addEventListener('click', startRun);
   $('btn-change').addEventListener('click', openMenu);
+  $('btn-shop').addEventListener('click', () => { openMenu(); setTab('shop'); });
   $('btn-menu').addEventListener('click', openMenu);
   $('btn-sound').addEventListener('click', () => audio.toggle());
   $('prev').addEventListener('click', () => selectBike(bikeIndex - 1));
@@ -513,6 +757,8 @@
         hit('lowpass', 90, 0.3 * k, 3.4, 0.9, 0.25);
         hit('bandpass', 400, 0.08 * k, 0.6, 0.6);
       },
+      // the E-Clutch biting: a thunk and a rising whine
+      clutch(k) { hit('lowpass', 180, 0.12 * k + 0.04, 0.18); tone('sawtooth', 300, 900, 0.03 * k + 0.01, 0.35); },
       // the stinger warning: a two-tone radio chirp
       alert() { tone('square', 1400, 1400, 0.035, 0.09); tone('square', 1000, 1000, 0.035, 0.09, 0.11); },
       busted() { tone('square', 600, 1300, 0.05, 0.35); tone('square', 1300, 600, 0.05, 0.35, 0.36); },
@@ -580,6 +826,12 @@
       if (e.type === 'pop') {
         audio.pop(e.preload);
         for (let i = 0; i < 6; i++) dustAt(sim.x - 0.05, 0.6);
+      } else if (e.type === 'clutch') {
+        audio.clutch(e.rev);
+        for (let i = 0; i < 14; i++) dustAt(sim.x - 0.05, 1.4);
+        shake = Math.max(shake, 0.15 * e.rev);
+      } else if (e.type === 'launch') {
+        audio.clutch(0.6);
       } else if (e.type === 'bottom') {
         audio.clunk(e.strength);
         if (e.end === 'rear') for (let i = 0; i < 6; i++) dustAt(sim.x, 1);
@@ -847,7 +1099,7 @@
 
     let input;
     if (mode === 'play') {
-      input = { throttle: keys.throttle, brake: keys.brake, lean: (keys.leanBack ? 1 : 0) - (keys.leanFwd ? 1 : 0) };
+      input = { throttle: keys.throttle, brake: keys.brake, lean: (keys.leanBack ? 1 : 0) - (keys.leanFwd ? 1 : 0), mode: modeIdx, clutch: keys.clutch, assistOff };
     } else if (mode === 'menu') {
       if (sim.status !== 'riding' && sim.crashT > 1.5) newRun(false);
       input = demoInput(dt);
@@ -880,7 +1132,8 @@
     updateRider(dt);
 
     // headlight: clicks on (with a flicker) as the light fades
-    if (atmo.headlights && !hlOn) { hlOn = true; hlT = 0; if (mode === 'play' && sim.time > 0.5) audio.click(); }
+    if (atmo.headlights && !hlOn && build.light) { hlOn = true; hlT = 0; if (mode === 'play' && sim.time > 0.5) audio.click(); }
+    if (atmo.headlights && !build.light && mode === 'play' && !run.tips.has('nolight') && atmo.light < 0.45) { run.tips.add('nolight'); hint('No lights on this bike · fit some in the workshop', 2.2); }
     if (!atmo.headlights && atmo.light > 0.7) hlOn = false;
     hlT += dt;
     if (hlOn) hl = hlT < 0.4 ? (Math.sin(hlT * 70) > 0.2 ? 1 : 0.15) : 1;
@@ -986,6 +1239,7 @@
     ctx.rotate(pose.ang);
     ctx.translate(-pose.pivot[0], -pose.pivot[1]);
     Art.drawBike(ctx, bike.id, {
+      style: build.style, lit: hl > 0.5,
       lean: sim.lean, spin: sim.x / bike.look.wheelRadius, blur: Math.min(1, sim.v / 14),
       rider: !rider, pitch: pose.ang, frontOff: pose.frontOff, rearOff: pose.rearOff,
     });
@@ -1030,7 +1284,10 @@
       const L = Art.info(bike.id).light;
       const [lx, ly] = poseToWorld(pose, L[0], L[1]);
       const [hx, hy] = toScreen(lx, ly);
-      lights.push({ kind: 'cone', x: hx, y: hy, angle: -pose.ang + 0.1, spread: 0.3, len: 11 * scale, power: 0.95 * hl });
+      const B = build.light;
+      lights.push({ kind: 'cone', x: hx, y: hy, angle: -pose.ang + 0.1, spread: B.spread, len: B.len * scale, power: B.power * hl });
+      // a flood beam spills low enough to light the ground with the front up
+      if (B.ground) lights.push({ kind: 'cone', x: hx, y: hy, angle: Math.max(-pose.ang + 0.45, 0.25), spread: 0.4, len: B.len * 0.55 * scale, power: 0.7 * hl });
     }
     const polOff = p && p.active && (p.x + Sim.COP.length - view.camX) * scale < 0;
     const near = p ? clamp(1 - p.gap / 70, 0, 1) : 0;
@@ -1249,6 +1506,16 @@
     $('hud-wind').classList.toggle('strong', kmh >= 30);
     const hh = Math.floor(atmo.tod), mm = Math.floor((atmo.tod - hh) * 60);
     $('hud-cond').textContent = `${weatherLabel()} · ${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}`;
+    // ride mode and the electronics at work
+    const P = build.perks, chips = [];
+    if (build.modes.length > 1) chips.push(`<span>${build.modes[modeIdx].name}</span>`);
+    if (P.has('traction')) chips.push(`<span class="${sim.spin > 0.2 || (sim.throttle > 0.9 && sim.v < 8) ? 'on' : ''}">TC</span>`);
+    if (P.has('antiLoop')) chips.push(`<span class="${assistOff ? 'off' : sim.assist > 0 ? 'hot' : ''}">Anti-loop${assistOff ? ' off' : ''}</span>`);
+    if (P.has('launch') && (sim.launchArmed || sim.launchT > 0)) chips.push(`<span class="on">${sim.launchArmed ? 'Launch armed' : 'Launch'}</span>`);
+    if (P.has('clutch')) chips.push(`<span class="${sim.clutchHeld ? 'on' : ''}">Clutch${sim.clutchHeld ? ` ${Math.round(sim.rev * 100)}%` : ''}</span>`);
+    if (P.has('regen')) chips.push(`<span class="${sim.throttle < 0.15 && sim.v > 2 && sim.status === 'riding' ? 'on' : ''}">Regen</span>`);
+    const html = chips.join('');
+    if (html !== hudModeHtml) { $('hud-mode').innerHTML = html; hudModeHtml = html; }
     const bsc = bestScore(bike.id);
     const fill = $('hud-bestfill');
     fill.style.width = bsc > 0 ? `${Math.min(100, (run.score / bsc) * 100)}%` : '0%';
@@ -1274,6 +1541,8 @@
   });
 
   resize();
+  drawChips();
+  setTab(tab);
   openMenu();
   atmo = Atmo.compute(timeOf.start, terrain.env, 0);
   requestAnimationFrame(frame);

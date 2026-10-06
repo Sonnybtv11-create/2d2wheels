@@ -28,7 +28,7 @@
         dark: '#202125', battery: '#2b2d31', rim: '#1d1e21', spoke: '#c4c7cc', accent: '#ffffff',
         forkUp: '#b8935a', forkLow: '#18191b', spring: '#e8e9eb', shockBody: '#2a2b2f', chain: '#8c8f94', sprocket: '#3a3c40',
       },
-      traced: 'stark-varg-mx',
+      traced: 'stark-varg-mx', paint: 'r',
       sprocket: 34, drive: [287, 404], driveR: 9,
       style: {
         rim: '#1a1b1e', spoke: '#c4c7cc', hub: '#c9ccd1', sprocket: '#7d8187', chain: '#8c8f94',
@@ -60,7 +60,7 @@
       // Body and frame come from the vectorised photo in js/traced/surron-lbx.js;
       // these parts fill in what the wheels hide (swingarm end, fork legs, chain).
       ref: { rear: [284, 870], front: [1334, 868], wheelbase: 1.26, tyre: 259 },
-      traced: 'surron-lbx',
+      traced: 'surron-lbx', paint: 'g',
       pal: {
         rim: '#1a1b1e', spoke: '#c4c7cc', chain: '#b08d52', sprocket: '#c2a46a',
         forkUp: '#c69f6c', forkLow: '#1c1d20', spring: '#c69f6c', shockBody: '#2a2b2f',
@@ -79,7 +79,7 @@
       },
       parts: [
         { k: 'chain' },
-        { k: 'poly', c: '#6c7230', p: [[250, 860], [300, 838], [420, 778], [540, 712], [600, 690], [660, 700], [690, 760], [660, 800], [560, 830], [420, 862], [300, 900], [258, 898]], smooth: 0.5 },
+        { k: 'poly', c: '#6c7230', paint: 0.35, p: [[250, 860], [300, 838], [420, 778], [540, 712], [600, 690], [660, 700], [690, 760], [660, 800], [560, 830], [420, 862], [300, 900], [258, 898]], smooth: 0.5 },
         { k: 'shock', a: [646, 694], b: [714, 530], w: 40 },
         { k: 'traced' },
         { k: 'controller', at: [560, 470], w: 90, h: 40, angle: -0.35 },
@@ -139,8 +139,16 @@
             path.closePath();
           }
         }
-        return { c: L.c, rings, path };
+        return { id: L.id, c: L.c, rings, path };
       });
+      // Paint: the bodywork's shade bands, ranked dark to light, so a new
+      // colour keeps the photo's lighting.
+      if (art.paint) {
+        const lum = (hex) => { const n = parseInt(hex.slice(1), 16); return 0.3 * (n >> 16) + 0.59 * ((n >> 8) & 255) + 0.11 * (n & 255); };
+        const ps = out.layers.filter((L) => L.id.startsWith(art.paint));
+        const ls = ps.map((L) => lum(L.c)), lo = Math.min(...ls), hi = Math.max(...ls);
+        ps.forEach((L, i) => { L.paint = hi > lo ? (ls[i] - lo) / (hi - lo) : 0.5; });
+      }
     }
     return out;
   }
@@ -159,6 +167,14 @@
   /* ------------------------------------------------------------------ */
 
   function col(pal, c) { return pal[c] || c; }
+
+  // A colour along a dark-mid-light ramp, t in 0..1.
+  function ramp(stops, t) {
+    const seg = t < 0.5 ? 0 : 1, k = t < 0.5 ? t * 2 : (t - 0.5) * 2;
+    const a = parseInt(stops[seg].slice(1), 16), b = parseInt(stops[seg + 1].slice(1), 16);
+    const mix = (sh) => Math.round(((a >> sh) & 255) + (((b >> sh) & 255) - ((a >> sh) & 255)) * k);
+    return `rgb(${mix(16)},${mix(8)},${mix(0)})`;
+  }
 
   function shade(hex, amt) {
     // amt > 0 lightens towards white, < 0 darkens towards black
@@ -660,27 +676,19 @@
     ctx.rotate(q.angle || 0);
     if (q.s) ctx.scale(q.s, q.s);
     const glow = lit ? 1 : 0;
-    if (L.type === 'bar') {
-      // a slim LED bar across the bars
-      const w = 0.17, h = 0.04;
+    if (L.type === 'square' || L.type === 'pod') {
+      // a square LED pod (big for the Squadron, small for the S1)
+      const k = L.type === 'square' ? 1 : 0.72;
+      ctx.scale(k, k);
       ctx.fillStyle = '#16171a';
-      ctx.fillRect(-w * 0.2, -h / 2, w * 0.4, h);
+      ctx.fillRect(-0.03, -0.012, 0.03, 0.024);
       ctx.fillStyle = L.housing || '#1d1e21';
       ctx.beginPath();
-      ctx.roundRect ? ctx.roundRect(0.0, -h / 2 - 0.02, 0.05, w, 0.01) : ctx.rect(0, -h / 2 - 0.02, 0.05, w);
+      ctx.roundRect ? ctx.roundRect(-0.005, -0.045, 0.06, 0.09, 0.01) : ctx.rect(-0.005, -0.045, 0.06, 0.09);
       ctx.fill();
-      ctx.fillStyle = glow ? '#fffbe8' : '#bcc6cf';
-      for (let i = 0; i < 4; i++) ctx.fillRect(0.034, -h / 2 - 0.012 + i * (w / 4.2), 0.012, w / 5.2);
-    } else if (L.type === 'pod') {
-      // a pair of square LED pods
-      for (const dy of [0.028, -0.028]) {
-        ctx.fillStyle = L.housing || '#1d1e21';
-        ctx.beginPath();
-        ctx.roundRect ? ctx.roundRect(-0.01, dy - 0.024, 0.055, 0.048, 0.008) : ctx.rect(-0.01, dy - 0.024, 0.055, 0.048);
-        ctx.fill();
-        ctx.fillStyle = glow ? '#fffbe8' : '#c9d3dc';
-        ctx.fillRect(0.034, dy - 0.018, 0.012, 0.036);
-      }
+      ctx.fillStyle = L.type === 'pod' ? '#e8a23a' : glow ? '#fffbe8' : '#c9d3dc';
+      ctx.fillRect(0.044, -0.038, 0.012, 0.076);
+      if (L.back) { ctx.fillStyle = L.back; ctx.fillRect(-0.005, -0.045, 0.006, 0.09); }
     } else {
       // stock round lamp in a shell
       ctx.fillStyle = L.housing || '#18191c';
@@ -768,7 +776,7 @@
   function drawPart(ctx, q, art, spin) {
     const pal = art.pal, st = art._st;
     switch (q.k) {
-      case 'poly': fillShape(ctx, q.p, col(pal, q.c), { smooth: q.smooth, gloss: q.gloss, alpha: q.alpha }); break;
+      case 'poly': fillShape(ctx, q.p, q.paint !== undefined && st.paint ? ramp(st.paint.ramp, q.paint) : col(pal, q.c), { smooth: q.smooth, gloss: q.gloss, alpha: q.alpha }); break;
       case 'fender':
         fillShape(ctx, q.p, col(pal, q.c), { smooth: 1, gloss: 0.8 });
         if (q.edge) stroke(ctx, q.p.slice(0, 4), 0.008, col(pal, q.edge));
@@ -804,7 +812,7 @@
       case 'stripes': case 'fins': case 'grid': case 'blocks': drawPattern(ctx, q, pal); break;
       case 'traced':
         for (const L of art.layers) {
-          ctx.fillStyle = L.c;
+          ctx.fillStyle = st.paint && L.paint !== undefined ? ramp(st.paint.ramp, L.paint) : L.c;
           if (L.path) ctx.fill(L.path, 'evenodd');
         }
         break;
