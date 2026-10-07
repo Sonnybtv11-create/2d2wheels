@@ -87,6 +87,13 @@
   let wantedMult = 1;
   const demo = { up: true, t: 0 };
   const keys = { throttle: false, brake: false, leanBack: false, leanFwd: false, clutch: false };
+  // Tricks: one key each, held. The last one pressed wins.
+  const TRICKS = {
+    swing: { label: 'Arm swing', mult: 1.5 },
+    drag: { label: 'Hand drag', mult: 3 },
+    surf: { label: 'Seat surf', mult: 2 },
+  };
+  const trickHeld = [];
   let build = null;     // the fitted parts for this run (Parts.apply)
   let modeIdx = 0;      // ride mode
   let assistOff = false; // anti-loop switched off
@@ -483,6 +490,7 @@
     bike = BIKES[bikeIndex];
     build = Parts.apply(bike, buildOf(bike.id));
     handling = Sim.deriveHandling(build.spec, Object.assign({}, build.mods, { perks: build.perks, modes: build.modes }));
+    handling.dragHip = Art.info(bike.id).dragHip;
     modeIdx = 0;
     assistOff = false;
     const seed = (Math.random() * 1e9) | 0;
@@ -500,7 +508,8 @@
     particles = [];
     debris = [];
     gone = new Set();
-    stats = { topSpeed: 0, clears: 0, closeCalls: 0, endT: 0 };
+    stats = { topSpeed: 0, clears: 0, closeCalls: 0, endT: 0, tricks: { swing: 0, drag: 0, surf: 0 } };
+    trickHeld.length = 0;
     run = { score: 0, mult: 1, lastX: 0, sweet: false, popups: [], milestone: 0, passedBest: false, danger: false, tips: new Set(), warned: new Set() };
     hl = 0; hlOn = false;
     demo.up = true; demo.t = 0;
@@ -547,6 +556,7 @@
     $('res-wheelie').textContent = `${fmt(sim.wheelieTotal)} m · longest ${fmt(sim.longest)} m`;
     $('res-clears').textContent = String(stats.clears) + (stats.closeCalls ? ` · ${stats.closeCalls} close call${stats.closeCalls > 1 ? 's' : ''}` : '');
     $('res-speed').textContent = `${Math.round(stats.topSpeed * 3.6)} km/h`;
+    $('res-tricks').textContent = trickSummary();
     $('res-bank').textContent = `${fmt(bank)} (+${fmt(run.score)})`;
     // the next thing the bank can buy for this bike, or the cheapest one to aim for
     const own = ownedMap(), parts = [];
@@ -579,6 +589,7 @@
     $('res-dist-m').textContent = `${fmt(sim.distance)} m · ${stats.endT.toFixed(0)} s`;
     $('res-wheelie').textContent = `${fmt(sim.wheelieTotal)} m in all`;
     $('res-clears').parentElement.hidden = true;
+    $('res-tricks').textContent = trickSummary();
     $('res-speed').textContent = `${top} km/h${newS && prevS ? ' · new best' : ''}`;
     $('res-bank').parentElement.hidden = true;
     $('res-shop').textContent = 'Practice: points only count on the desert track.';
@@ -587,6 +598,11 @@
     rb.className = 'res-best' + (newW ? ' new' : '');
     show('results', true); show('touch', false);
     $('btn-retry').focus({ preventScroll: true });
+  }
+
+  function trickSummary() {
+    const parts = Object.keys(TRICKS).filter((k) => stats.tricks[k] >= 1).map((k) => `${TRICKS[k].label.toLowerCase()} ${Math.round(stats.tricks[k])} m`);
+    return parts.length ? parts.join(' · ') : 'none';
   }
 
   function toast(text, big) {
@@ -613,6 +629,8 @@
     ArrowLeft: 'leanBack', KeyA: 'leanBack',
     ArrowRight: 'leanFwd', KeyD: 'leanFwd',
     ShiftLeft: 'clutch', ShiftRight: 'clutch',
+    // tricks: left hand for arrow riders, right hand for WASD riders
+    KeyZ: 'swing', KeyJ: 'swing', KeyX: 'drag', KeyK: 'drag', KeyC: 'surf', KeyL: 'surf',
   };
 
   function toggleAssist() {
@@ -648,20 +666,28 @@
     if (e.code === 'KeyQ') { if (!e.repeat) nextMode(); return; }
     if (e.code === 'KeyE') { if (!e.repeat) toggleAssist(); return; }
     const k = KEYMAP[e.code];
+    if (k && TRICKS[k]) { if (!trickHeld.includes(k)) trickHeld.push(k); e.preventDefault(); return; }
     if (k) { keys[k] = true; e.preventDefault(); }
   });
   window.addEventListener('keyup', (e) => {
     const k = KEYMAP[e.code];
+    if (k && TRICKS[k]) { const i = trickHeld.indexOf(k); if (i >= 0) trickHeld.splice(i, 1); return; }
     if (k) keys[k] = false;
   });
-  window.addEventListener('blur', () => { for (const k in keys) keys[k] = false; });
+  window.addEventListener('blur', () => { for (const k in keys) keys[k] = false; trickHeld.length = 0; });
 
   $('touch-mode').addEventListener('pointerdown', (e) => { e.preventDefault(); nextMode(); });
   $('touch-assist').addEventListener('pointerdown', (e) => { e.preventDefault(); toggleAssist(); });
   document.querySelectorAll('.touch-btn[data-key]').forEach((btn) => {
     const k = btn.dataset.key;
-    const on = (e) => { e.preventDefault(); btn.setPointerCapture(e.pointerId); keys[k] = true; btn.classList.add('active'); audio.unlock(); };
-    const off = () => { keys[k] = false; btn.classList.remove('active'); };
+    const on = (e) => {
+      e.preventDefault(); btn.setPointerCapture(e.pointerId); btn.classList.add('active'); audio.unlock();
+      if (TRICKS[k]) { if (!trickHeld.includes(k)) trickHeld.push(k); } else keys[k] = true;
+    };
+    const off = () => {
+      btn.classList.remove('active');
+      if (TRICKS[k]) { const i = trickHeld.indexOf(k); if (i >= 0) trickHeld.splice(i, 1); } else keys[k] = false;
+    };
     btn.addEventListener('pointerdown', on);
     btn.addEventListener('pointerup', off);
     btn.addEventListener('pointercancel', off);
@@ -681,7 +707,7 @@
   /* ---------- audio: all synthesized ---------- */
   const audio = (() => {
     let ac = null, out, osc, osc2, gain, filter, roarGain, noiseBuf;
-    let rainGain, rushGain, rushFilter, sirenOsc, sirenGain, rotorGain;
+    let rainGain, rushGain, rushFilter, sirenOsc, sirenGain, rotorGain, scrapeGain;
     let muted = store.get('muted', false);
     const label = () => { $('snd-on').style.display = muted ? 'none' : ''; $('snd-off').style.display = muted ? '' : 'none'; };
     label();
@@ -749,6 +775,10 @@
         sirenGain = ac.createGain(); sirenGain.gain.value = 0;
         sirenOsc.connect(sf); sf.connect(sirenGain); sirenGain.connect(out);
         osc.start(); osc2.start(); roar.start(); rain.start(); rush.start(); sirenOsc.start();
+        const scrape = noise(), sf2 = ac.createBiquadFilter(); sf2.type = 'bandpass'; sf2.frequency.value = 2600; sf2.Q.value = 1.4;
+        scrapeGain = ac.createGain(); scrapeGain.gain.value = 0;
+        scrape.connect(sf2); sf2.connect(scrapeGain); scrapeGain.connect(out);
+        scrape.start();
         const rotor = noise(), rf2 = ac.createBiquadFilter(); rf2.type = 'lowpass'; rf2.frequency.value = 160;
         const chop = ac.createGain(); chop.gain.value = 0.5;
         const lfo = ac.createOscillator(); lfo.frequency.value = 11; lfo.type = 'square';
@@ -772,6 +802,8 @@
         const air = riding ? clamp((s.v - 6) / 30, 0, 1) : 0;
         rushGain.gain.setTargetAtTime(air * air * 0.11, t, 0.15);
         rushFilter.frequency.setTargetAtTime(250 + air * 900, t, 0.15);
+        // the glove scraping the ground in a hand drag
+        scrapeGain.gain.setTargetAtTime(riding && s.handDown ? 0.05 + Math.min(0.06, s.v * 0.003) : 0, t, 0.04);
         // siren: a slow wail far off, a fast yelp up close
         const p = s.police;
         let sv = 0;
@@ -852,8 +884,19 @@
     const bal = Sim.balanceAngle(sim, handling);
     run.sweet = sim.inWheelie && sim.theta > bal - 7 * DEG && sim.theta < bal + 2 * DEG;
     run.mult = sim.inWheelie ? (run.sweet ? 4 : 2) : 1;
-    run.score += Math.max(0, sim.x - run.lastX) * run.mult * wantedMult;
+    // a trick in full flow multiplies on top (the hand drag only with the hand down)
+    const tr = sim.trick;
+    const trickOn = tr && (tr === 'drag' ? sim.handDown : sim.trickK > 0.85);
+    if (trickOn) run.mult *= TRICKS[tr].mult;
+    const dx = Math.max(0, sim.x - run.lastX);
+    run.score += dx * run.mult * wantedMult;
     run.lastX = sim.x;
+    // trick lengths, with a popup when one ends
+    if (trickOn) { stats.tricks[tr] += dx; run.trickRun = (run.trickRun && run.trickRun.t === tr ? run.trickRun : { t: tr, d: 0 }); run.trickRun.d += dx; }
+    else if (run.trickRun) {
+      if (run.trickRun.d > 3) popup(`${TRICKS[run.trickRun.t].label} ${Math.round(run.trickRun.d)} m`, sim.x + 0.3, terrain.base(sim.x) + 2.2, 'rgba(127,240,255,A)', true);
+      run.trickRun = null;
+    }
 
     // close calls: let the police get right on your tail, then pull away
     const p = sim.police;
@@ -1095,8 +1138,11 @@
     const hip = Art.info(bike.id).hip;
     const hw = poseToWorld(before, hip[0], hip[1]);
     const v = vBefore;
-    const overhead = sim.cause === 'Hit the pipe' || sim.cause === 'Hit the barrier';
-    rider = overhead
+    const overhead = sim.cause === 'Hit the pipe' || sim.cause === 'Hit the barrier' || sim.cause === 'Fell off the seat';
+    rider = sim.cause === 'Arm buckled'
+      // the arm folds and the rider goes down on their back behind the bike
+      ? { x: hw[0], y: hw[1], vx: v * 0.4, vy: 0.5, rot: before.ang, vrot: 2.5 }
+      : overhead
       // swept off backwards by the bar, while the bike runs on and goes down
       ? { x: hw[0], y: hw[1] + 0.2, vx: v * 0.15, vy: 1.5, rot: before.ang, vrot: 5 + v * 0.1 }
       : forward
@@ -1141,7 +1187,9 @@
     const bal = Sim.balanceAngle(s, h);
     const target = demo.up || ahead ? bal - 12 * DEG : 0;
     const err = target - s.theta - 0.3 * s.omega;
-    return { throttle: err > 0, brake: err < -6 * DEG, lean: 1 };
+    // show off an arm swing in a settled wheelie
+    const swing = demo.up && s.wheelieTime > 2 && (s.wheelieTime % 7) < 3.5;
+    return { throttle: err > 0, brake: err < -6 * DEG, lean: 1, trick: swing ? 'swing' : null };
   }
 
   /* ---------- main loop ---------- */
@@ -1155,7 +1203,7 @@
 
     let input;
     if (mode === 'play') {
-      input = { throttle: keys.throttle, brake: keys.brake, lean: (keys.leanBack ? 1 : 0) - (keys.leanFwd ? 1 : 0), mode: modeIdx, clutch: keys.clutch, assistOff };
+      input = { throttle: keys.throttle, brake: keys.brake, lean: (keys.leanBack ? 1 : 0) - (keys.leanFwd ? 1 : 0), mode: modeIdx, clutch: keys.clutch, assistOff, trick: trickHeld[trickHeld.length - 1] || null };
     } else if (mode === 'menu') {
       if (sim.status !== 'riding' && sim.crashT > 1.5) newRun(false);
       input = demoInput(dt);
@@ -1217,7 +1265,8 @@
     const p = sim.police;
     const nose = sim.x + handling.wheelbase;
     const next = terrain.obstaclesNear(nose + 3, nose + 3 + Math.max(10, sim.v * 1.2)).find((o) => !o.soft && !gone.has(o));
-    if (sim.inWheelie && sim.theta > bal + 2 * DEG) hint('Past the balance point · brake', 0.3, true);
+    if (sim.handDown && sim.handLoad > Sim.TUNE.dragLoad * 0.75) hint('Easy on the gas · your arm is buckling', 0.3, true);
+    else if (sim.inWheelie && sim.theta > bal + 2 * DEG && sim.trick !== 'drag') hint(sim.trick === 'swing' || sim.trick === 'surf' ? 'Past the balance point · let go of the trick' : 'Past the balance point · brake', 0.3, true);
     else if (p && p.active && p.gap < 12) hint('They\'re on you · hold → to tuck and pull away', 0.3, true);
     else if (next && next.overhead && runsThisSession <= 3) once('low' + next.x, `${next.type === 'gate' ? 'Barrier' : 'Low pipe'} · front down and hold → to tuck under it`, 1.6, true);
     else if (next && next.tall && sim.frontDown && runsThisSession <= 3) once('tyres' + next.x, 'Tyre stack · pop the front over it', 1.2, true);
@@ -1305,11 +1354,23 @@
     ctx.translate(-pose.pivot[0], -pose.pivot[1]);
     Art.drawBike(ctx, bike.id, {
       style: build.style, lit: hl > 0.5, tuck: sim.tuck,
+      trick: sim.trick && sim.status === 'riding' ? { type: sim.trick, k: sim.trickK, phase: sim.trickPhase, handDown: sim.handDown, lean: sim.lean } : null,
+      groundAt: (lx, ly) => { const w = poseToWorld(pose, lx, ly); return w[1] - terrain.surface(w[0]); },
       lean: sim.lean, spin: sim.x / bike.look.wheelRadius, blur: Math.min(1, sim.v / 14),
       rider: !rider, pitch: pose.ang, frontOff: pose.frontOff, rearOff: pose.rearOff,
     });
     ctx.restore();
 
+    // the dragging glove: sparks off its slider puck, and dust
+    if (sim.handDown && sim.status === 'riding') {
+      const hnd = Art.info(bike.id).hand;
+      if (hnd) {
+        const [wx] = poseToWorld(pose, hnd[0], hnd[1]);
+        const gy = terrain.surface(wx);
+        if (Math.random() < 0.8) sparks(wx, gy + 0.03, 2);
+        if (Math.random() < 0.4) dustAt(wx, 0.6);
+      }
+    }
     if (rider) {
       ctx.save();
       ctx.translate((rider.x - view.camX) * scale, toScreenY(rider.y));
@@ -1720,6 +1781,15 @@
     // ride mode and the electronics at work
     const P = build.perks, chips = [];
     if (sim.tuck > 0.6) chips.push('<span class="on">Tuck</span>');
+    if (sim.trick) {
+      const on = sim.trick === 'drag' ? sim.handDown : sim.trickK > 0.85;
+      chips.push(`<span class="${on ? 'hot' : ''}">${TRICKS[sim.trick].label}${on ? ` ×${TRICKS[sim.trick].mult}` : ''}</span>`);
+      // how close the arm is to buckling under the gas
+      if (sim.handDown) {
+        const strain = Math.min(1, sim.handLoad / Sim.TUNE.dragLoad);
+        chips.push(`<span class="${strain > 0.75 ? 'hot' : 'on'}">Arm ${Math.round(strain * 100)}%</span>`);
+      }
+    }
     if (build.modes.length > 1) chips.push(`<span>${build.modes[modeIdx].name}</span>`);
     if (P.has('traction')) chips.push(`<span class="${sim.spin > 0.2 || (sim.throttle > 0.9 && sim.v < 8) ? 'on' : ''}">TC</span>`);
     if (P.has('antiLoop')) chips.push(`<span class="${assistOff ? 'off' : sim.assist > 0 ? 'hot' : ''}">Anti-loop${assistOff ? ' off' : ''}</span>`);
@@ -1739,7 +1809,7 @@
   Object.defineProperty(window, 'wheelieState', {
     get: () => sim && {
       mode, status: sim.status, cause: sim.cause, theta: sim.theta, omega: sim.omega, v: sim.v, lean: sim.lean,
-      dist: sim.wheelieDist, time: sim.time, inWheelie: sim.inWheelie, frontDown: sim.frontDown, airborne: sim.airborne,
+      dist: sim.wheelieDist, time: sim.time, trick: sim.trick, trickK: sim.trickK, handDown: sim.handDown, handLoad: sim.handLoad, inWheelie: sim.inWheelie, frontDown: sim.frontDown, airborne: sim.airborne,
       cr: sim.cr, cf: sim.cf, popT: sim.popT, tuck: sim.tuck, throttle: sim.throttle, x: sim.x, distance: sim.distance, inPuddle: sim.inPuddle, inMud: sim.inMud,
       score: run ? run.score : 0, clears: stats ? stats.clears : 0,
       police: sim.police && { gap: sim.police.gap, active: sim.police.active, v: sim.police.v, level: sim.police.level },

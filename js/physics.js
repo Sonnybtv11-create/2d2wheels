@@ -61,6 +61,18 @@
     tuckDrag: 0.62,     // ... tucked on two wheels: about 17% more top speed
     tuckRate: 3,        // how quickly the rider gets down into the tuck (1/s)
     tuckMaxAngle: 10 * DEG,
+    // Tricks. How fast the rider gets into and out of each (1/s).
+    trickIn: { swing: 5, drag: 3, surf: 1.6 },
+    trickOut: { swing: 6, drag: 1.8, surf: 2 },
+    swingRock: 1.2,     // the swinging arm rocks the bike (rad/s²)
+    dragLean: 2.2,      // hanging off the back for a hand drag: far more lean than a normal lean back
+    // Where the dragging hand's shoulder sits: the hips on the seat, the
+    // torso 45° back, the near shoulder dropped over the side.
+    dragHip: [0.05, 0.6], dragDrop: 0.35, dragReach: 0.66,
+    dragFriction: 2.2,  // the glove sliding on the ground (m/s²)
+    dragBuckle: 1.7,    // pitch rate (rad/s) the arm can catch
+    dragLoad: 2.6,      // how hard the throttle can drive the bike onto the arm (rad/s²): feather it
+    surfLean: 0.6,      // standing on the seat, a weight shift moves the balance more
     airThrottle: 2.2, airBrake: 3.5, // rotation in the air from wheel spin-up / braking (rad/s²)
     // The pop: snapping into a lean-back with the front down and the throttle
     // on kicks the nose up (body weight plus the fork's rebound). Dipping
@@ -341,6 +353,7 @@
       spin: 0, // rear wheelspin 0..1
       leanIn: 0, popT: 0, // last lean input, time since the last pop
       tuck: 0,                     // 0..1, how far down into the tuck the rider is
+      trick: null, trickK: 0, trickPhase: 0, surfThrottle: 0, handDown: false, handX: 0, handLoad: 0,
       mode: '', launchArmed: false, launchT: 0, rev: 0, clutchHeld: false, assist: 0,
       status: 'riding',            // riding | crashed | busted
       cause: '',                   // why the run ended
@@ -382,6 +395,24 @@
       return;
     }
 
+    // Tricks: 'swing' (near arm off the bar, windmilling), 'drag' (hang off
+    // the back and drag a hand on the ground), 'surf' (stand on the seat).
+    // One at a time; the rider has to come back before starting another.
+    const ev0 = s.events.length;
+    const trickWant = input.trick || null;
+    if (s.trick && s.trick !== trickWant) {
+      s.trickK = Math.max(0, s.trickK - TUNE.trickOut[s.trick] * dt);
+      if (s.trickK <= 0) s.trick = null;
+    } else if (trickWant && !s.trick && (trickWant !== 'surf' || (!s.airborne && s.v > 2))) {
+      s.trick = trickWant; s.trickK = 0;
+      if (trickWant === 'surf') s.surfThrottle = s.throttle;
+    }
+    if (s.trick && s.trick === trickWant) s.trickK = Math.min(1, s.trickK + TUNE.trickIn[s.trick] * dt);
+    s.trickPhase += dt * 7.5;
+    const surfing = s.trick === 'surf';
+    // the near hand works the rear brake lever; it's busy in every trick
+    const handOff = (s.trick === 'swing' || s.trick === 'drag') && s.trickK > 0.3;
+
     // Keys are on/off, but throttle and brake ramp, so a tap is a small input
     // and a hold is a big one.
     const mode = h.modes[(input.mode | 0) % h.modes.length];
@@ -396,10 +427,15 @@
     }
     if (s.launchT > 0) s.launchT -= dt;
     const launching = s.launchT > 0 && input.throttle;
-    s.throttle += clamp((input.throttle ? 1 : 0) - s.throttle, -TUNE.throttleDown * dt, (launching ? 40 : TUNE.throttleUp * mode.ramp) * dt);
-    s.brake += clamp((input.brake && !s.launchArmed ? 1 : 0) - s.brake, -TUNE.brakeDown * dt, TUNE.brakeUp * dt);
+    // Seat surfing, the throttle stays where it was when you stood up.
+    if (surfing) s.throttle = s.surfThrottle;
+    else s.throttle += clamp((input.throttle ? 1 : 0) - s.throttle, -TUNE.throttleDown * dt, (launching ? 40 : TUNE.throttleUp * mode.ramp) * dt);
+    s.brake += clamp((input.brake && !s.launchArmed && !handOff && !surfing ? 1 : 0) - s.brake, -TUNE.brakeDown * dt, TUNE.brakeUp * dt);
     if (s.launchArmed) { s.brake = 0; s.v = 0; }
-    s.lean += clamp((input.lean || 0) - s.lean, -TUNE.leanRate * dt, TUNE.leanRate * dt);
+    let leanWant = input.lean || 0;
+    if (s.trick === 'drag') leanWant += (TUNE.dragLean - leanWant) * s.trickK;
+    else if (surfing) leanWant *= 1 + TUNE.surfLean * s.trickK;
+    s.lean += clamp(leanWant - s.lean, -TUNE.leanRate * dt, TUNE.leanRate * dt);
     s.braking = s.brake > 0.3;
 
     const R = h.wheelRadius, WB = h.wheelbase;
@@ -420,7 +456,7 @@
     // The pop (see TUNE.pop).
     const leanIn = input.lean || 0;
     s.popT += dt;
-    if (leanIn > 0.5 && s.leanIn <= 0 && input.throttle && s.cr > 0 && s.theta < TUNE.popMaxAngle && s.popT > TUNE.popCooldown) {
+    if (leanIn > 0.5 && s.leanIn <= 0 && input.throttle && !surfing && s.trick !== 'drag' && s.cr > 0 && s.theta < TUNE.popMaxAngle && s.popT > TUNE.popCooldown) {
       const preload = s.cf > 0 ? clamp((s.cf - h.forkSag) / 0.1, 0, 1) : 0;
       s.omega += (TUNE.pop + TUNE.popPreload * preload) * h.pop * Math.sqrt(3 / h.pitchArm);
       s.popT = 0;
@@ -512,7 +548,7 @@
     // Tuck: the rider down over the bars, leaning forward with the front
     // down (or skimming just off the ground under hard drive). It's posture,
     // so a bump that unloads the rear doesn't break it.
-    const tuckWant = (input.lean || 0) < -0.5 && s.theta < TUNE.tuckMaxAngle;
+    const tuckWant = (input.lean || 0) < -0.5 && s.theta < TUNE.tuckMaxAngle && !s.trick;
     s.tuck = clamp(s.tuck + (tuckWant ? 1 : -1.6) * TUNE.tuckRate * dt, 0, 1);
     const dragMul = s.inWheelie ? TUNE.wheelieDrag : 1 - (1 - TUNE.tuckDrag) * s.tuck;
     const drag = h.dragK * s.v * s.v * dragMul;
@@ -561,6 +597,7 @@
       const geff = G + ay; // gravity felt in the chassis's accelerating frame
       const moment = push * Math.sin(beta) - geff * Math.cos(beta + slope) + Ff * TUNE.frontLever * Math.cos(psi);
       alpha = moment / h.pitchArm - TUNE.pitchDamp * s.omega;
+      if (s.trick === 'swing') alpha += TUNE.swingRock * Math.sin(s.trickPhase) * s.trickK;
     }
     s.omega += alpha * dt;
     s.theta += s.omega * dt;
@@ -573,6 +610,46 @@
         if (s.omega < -0.6) s.events.push({ type: 'bottom', end: 'front', strength: -s.omega * WB });
         s.theta += (c - h.forkTravel) / (WB * Math.max(0.3, Math.cos(p2)));
         s.omega = Math.max(s.omega, 0);
+      }
+    }
+
+    /* --- hand drag --- */
+    // Hanging off the back takes the bike past its balance point; the hand
+    // on the ground holds it there. It's a hard stop for the pitch, so long
+    // as the arm can take the hit, and the glove sliding costs speed.
+    // (letting go, the hand stays down to push the rider back up until
+    // their weight is forward again)
+    const wasDown = s.handDown, leaving = trickWant !== 'drag';
+    s.handDown = false;
+    if (!wasDown) s.handLoad = 0;
+    if (s.trick === 'drag' && (s.trickK > 0.85 || (leaving && wasDown && s.trickK > 0.1)) && !s.airborne) {
+      const p3 = s.theta + slope, c = Math.cos(p3), sn = Math.sin(p3);
+      const [hx, hy] = h.dragHip || TUNE.dragHip;
+      const hipX = s.x + hx * c - hy * sn;
+      const hipY = terrain.base(s.x) + s.yq + R + hx * sn + hy * c;
+      // torso 45° back in the world, near shoulder dropped over the side
+      const shX = hipX - 0.354, shY = hipY + 0.354 - TUNE.dragDrop;
+      const gap = shY - TUNE.dragReach - terrain.base(shX);
+      if (gap < 0) {
+        if (s.omega > TUNE.dragBuckle) {
+          s.events.push({ type: 'impact', obstacle: { type: 'hand', x: shX, w: 0.2, h: 0 }, strength: 2, end: 'rider', v: s.v });
+          crash(s, 'Arm buckled');
+          return;
+        }
+        const d = hx * c - hy * sn; // how the hip's height changes with pitch
+        if (d < -0.05) s.theta += -gap / d;
+        // how hard the bike is pushing onto the arm (rad/s², smoothed)
+        // (the landing itself is the buckle check above, not load)
+        if (wasDown) s.handLoad += (Math.max(0, s.omega) / dt - s.handLoad) * Math.min(1, dt * 6);
+        s.omega = Math.min(s.omega, 0);
+        if (s.handLoad > TUNE.dragLoad) {
+          s.events.push({ type: 'impact', obstacle: { type: 'hand', x: shX, w: 0.2, h: 0 }, strength: 2, end: 'rider', v: s.v });
+          crash(s, 'Arm buckled');
+          return;
+        }
+        s.handDown = true;
+        s.handX = shX;
+        s.v = Math.max(0, s.v - TUNE.dragFriction * dt);
       }
     }
 
@@ -653,6 +730,14 @@
       s.events.push({ type: 'clear', obstacle: { type: 'stinger', x: st.x, w: st.w, h: 0.04 }, stinger: st });
     }
     if (s.stingers.length && s.stingers[0].x < s.x - 40) s.stingers.shift();
+
+    // Standing on the seat, a hard jolt throws you off.
+    if (surfing && s.trickK > 0.5) {
+      for (let i = ev0; i < s.events.length; i++) {
+        const e = s.events[i];
+        if ((e.type === 'impact' && e.strength > 0.5) || e.type === 'bottom') { crash(s, 'Fell off the seat'); return; }
+      }
+    }
 
     if (s.theta >= CRASH_ANGLE) { crash(s, 'Looped out'); return; }
     if (s.theta < -25 * DEG) { crash(s, 'Went over the bars'); return; }

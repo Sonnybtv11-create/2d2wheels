@@ -14,6 +14,9 @@ There's no build step and nothing to install. The display fonts load from Google
 | Ride mode (power map) | `Q` | MODE |
 | E-Clutch (if fitted) | `Shift` | CLUTCH |
 | Anti-loop on/off (if fitted) | `E` | ASSIST |
+| Arm swing (hold) | `Z` or `J` | SWING |
+| Hand drag (hold) | `X` or `K` | DRAG |
+| Seat surf (hold) | `C` or `L` | SURF |
 | Retry / Menu / Sound | `R` / `Esc` / `M` | buttons |
 
 - **The pop:** on the gas, snap into a lean-back and the front comes up. Dip forward first to load the fork for a bigger pop. Then hold the wheelie with the throttle and the brake.
@@ -43,7 +46,23 @@ There's no build step and nothing to install. The display fonts load from Google
   | ★★★★★ | An unmarked interceptor replaces the cruiser | ×4 |
 - **Scoring:** 1 point per metre on two wheels, 2 on the back wheel and 4 in the sweet spot just under the balance point (the gauge glows). Plus bonuses for obstacles and stingers cleared, cones and close calls. Everything is multiplied by your wanted level, and it all goes into your bank for the workshop.
 - **The strip at the top** shows the police behind you, then the obstacles (tyre stacks in red), mud, whoops and puddles ahead.
-- A run ends when you loop out, go over the bars, hit a tyre stack, a stinger, a pipe or a barrier, or get busted. Your best score, furthest distance, points and parts are saved in the browser.
+- A run ends when you loop out, go over the bars, hit a tyre stack, a stinger, a pipe or a barrier, buckle your arm in a hand drag, fall off the seat, or get busted. Your best score, furthest distance, points and parts are saved in the browser.
+
+### Tricks
+
+The three classic e-bike video stunts. Hold the key to do one, let go to stop. The left-hand keys (`Z X C`) are for riding on the arrows, the right-hand ones (`J K L`) for riding on `WASD`, so your balance keys stay where they are.
+
+- **Arm swing (×1.5):** the near hand comes off the bar and windmills. That's the hand on the rear brake lever, so there's no brake while you swing, and the swinging arm rocks the bike.
+- **Hand drag (×3 while the glove's on the ground):**
+  - Slide back onto the rear fender, lean back and drop a shoulder over the side.
+  - Your weight goes so far back that the bike carries on past its balance point, until your glove meets the ground and holds it there (about 55° on the Sur-Ron, 60° on the Varg), throwing sparks.
+  - The sliding glove costs speed, so keep a little gas on. Too much and you drive the bike onto your arm until it buckles.
+  - Let go and the hand pushes you back up while your weight comes forward; lean forward to get the front back under control.
+- **Seat surf (×2):** climb up and stand on the seat with your arms out.
+  - The throttle stays where it was when you stood up, and there's no brake. You steer only with your weight (← →), which works harder standing up.
+  - Works on two wheels or in a wheelie. Any hard bump or landing throws you off.
+
+The multipliers stack with the wheelie ones, so a hand drag in a wheelie is worth ×6. The results show how far you went doing each trick.
 
 ### Location
 

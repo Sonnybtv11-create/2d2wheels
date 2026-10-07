@@ -325,3 +325,68 @@ test('the airfield is flat and empty, and runs on forever', () => {
     assert.equal(s.status, 'riding', `${b.id}: ${s.cause}`);
   }
 });
+
+// Ride a steady wheelie to `t0`, then run `policy` for the rest.
+function trickRun(b, policy, maxT = 12) {
+  const h = Sim.deriveHandling(b);
+  const t = Sim.createTerrain(1, { airfield: true });
+  const s = Sim.createState();
+  let k = 0;
+  while (s.status === 'riding' && s.time < maxT) {
+    let inp;
+    if (s.time < 5) {
+      if (s.frontDown) { k = (k + 1) % 120; inp = { throttle: true, lean: k < 60 ? -1 : 1 }; }
+      else { const e = 20 * D - s.theta - 0.3 * s.omega; inp = { throttle: e > 0, brake: e < -6 * D, lean: 1 }; }
+    } else inp = policy(s);
+    Sim.substep(s, inp, h, t, Sim.FIXED_DT);
+    s.events.length = 0;
+  }
+  return s;
+}
+
+test('arm swing: the near hand is off the bar, so no rear brake', () => {
+  const s = trickRun(byId('surron-lbx'), (st) => ({ trick: 'swing', brake: true, throttle: st.theta < 18 * D }), 7);
+  assert.equal(s.trick, 'swing');
+  assert.ok(s.brake < 0.05, `brake ${s.brake}`);
+});
+
+test('hand drag: past the balance point the hand holds the bike, and letting go recovers', () => {
+  for (const b of BIKES) {
+    let caught = false;
+    const s = trickRun(b, (st) => {
+      // feather the gas with the hand down: about 40% of the time
+      if (st.time < 9) { caught = caught || st.handDown; return { trick: 'drag', throttle: st.handDown ? st.time % 0.25 < 0.1 : st.omega < 1.2 }; }
+      const e = 15 * D - st.theta - 0.3 * st.omega;
+      return { throttle: e > 0, brake: e < -6 * D, lean: -1 };
+    }, 14);
+    assert.ok(caught, `${b.id}: hand never reached the ground`);
+    assert.equal(s.status, 'riding', `${b.id}: ${s.cause}`);
+    assert.ok(s.theta < 30 * D, `${b.id}: back to a normal wheelie (${(s.theta / D).toFixed(0)}°)`);
+  }
+});
+
+test('hand drag: pinning the gas onto the arm buckles it', () => {
+  for (const b of BIKES) {
+    const s = trickRun(b, () => ({ trick: 'drag', throttle: true }), 12);
+    assert.equal(s.cause, 'Arm buckled', b.id);
+  }
+});
+
+test('seat surf: throttle locked, steering by weight, and a hard hit throws you off', () => {
+  const b = byId('surron-lbx');
+  let thr = null, steady = true;
+  const s = trickRun(b, (st) => {
+    if (st.trickK >= 1) { if (thr === null) thr = st.throttle; else if (Math.abs(st.throttle - thr) > 1e-9) steady = false; }
+    return { trick: 'surf', throttle: !!(st.time % 1 < 0.5), brake: true, lean: st.theta > 3 * D ? -1 : 0 };
+  }, 9);
+  assert.equal(s.status, 'riding', s.cause);
+  assert.ok(steady && thr !== null, 'throttle stayed put while surfing');
+  // a log under the wheels while standing on the seat
+  const h = Sim.deriveHandling(b);
+  const t = Sim.createTerrain(1, { airfield: true });
+  t.obstacles.push({ type: 'log', x: 80, w: 0.27, h: 0.27, tall: false, soft: false });
+  const s2 = Sim.createState({ x: 40 });
+  s2.v = 14;
+  while (s2.status === 'riding' && s2.x < 90) { Sim.substep(s2, { trick: 'surf' }, h, t, Sim.FIXED_DT); s2.events.length = 0; }
+  assert.equal(s2.cause, 'Fell off the seat');
+});

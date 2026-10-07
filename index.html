@@ -47,6 +47,9 @@
     </div>
     <div class="touch-group touch-mini">
       <button id="touch-mode" class="touch-btn mini" type="button" data-tap="mode"><span>Mode</span></button>
+      <button class="touch-btn mini trick" type="button" data-key="swing"><span>Swing</span></button>
+      <button class="touch-btn mini trick" type="button" data-key="drag"><span>Drag</span></button>
+      <button class="touch-btn mini trick" type="button" data-key="surf"><span>Surf</span></button>
       <button id="touch-assist" class="touch-btn mini" type="button" hidden><span>Assist</span></button>
       <button id="touch-clutch" class="touch-btn mini" type="button" data-key="clutch" hidden><span>Clutch</span></button>
     </div>
@@ -111,6 +114,7 @@
         <span><span class="kbd">→</span><span class="kbd">D</span> Lean forward</span>
         <span><span class="kbd">Q</span> Ride mode</span>
         <span><span class="kbd">Shift</span> E-Clutch · <span class="kbd">E</span> Anti-loop (if fitted)</span>
+        <span>Tricks (hold): <span class="kbd">Z</span>/<span class="kbd">J</span> Arm swing · <span class="kbd">X</span>/<span class="kbd">K</span> Hand drag · <span class="kbd">C</span>/<span class="kbd">L</span> Seat surf</span>
         <span>Snap back on the gas to pop the front over obstacles. Wheelie to outrun the police: you're faster on one wheel. Sit just under the balance point for double points.</span>
         <span class="fine">Specs from manufacturer and retailer listings; physics simplified. A fan game, not affiliated with these brands.</span>
       </footer>
@@ -127,6 +131,7 @@
         <div><dt>On the back wheel</dt><dd id="res-wheelie">0 m</dd></div>
         <div><dt>Obstacles cleared</dt><dd id="res-clears">0</dd></div>
         <div><dt>Top speed</dt><dd id="res-speed">0 km/h</dd></div>
+        <div><dt>Tricks</dt><dd id="res-tricks">none</dd></div>
         <div><dt>Points to spend</dt><dd id="res-bank">0</dd></div>
       </dl>
       <p id="res-shop" class="res-shop"></p>

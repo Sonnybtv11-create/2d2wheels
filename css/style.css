@@ -229,6 +229,7 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .touch-mini { flex-direction: column; justify-content: flex-end; }
 .touch-btn.mini { width: 68px; height: 42px; border-radius: 10px; font-size: 13px; padding: 6px; }
 .touch-btn[hidden] { display: none; }
+.touch-btn.trick { border-color: #7ff0ff; color: #7ff0ff; }
 .meta { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .plate-num {
   display: inline-grid; place-items: center;
