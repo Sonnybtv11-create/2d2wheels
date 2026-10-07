@@ -195,20 +195,6 @@ test('a wet track gives less grip than a dry one', () => {
   assert.ok(launch(Sim.createWeather(1, 'storm')) < launch(undefined) - 0.5);
 });
 
-test('a headwind lifts the nose, a tailwind pushes it down', () => {
-  const b = byId('surron-lbx');
-  const h = Sim.deriveHandling(b);
-  const omegaWith = (w) => {
-    const t = flatTrack();
-    t.env = { kind: 'test', wind: () => w, rain: () => 0, wet: 0 };
-    const s = Sim.createState();
-    s.v = 15; s.theta = 30 * D; s.lean = 1; s.cr = s.crPrev = h.rearSag + 0.035; s.yq = -0.035; s.cf = s.cfPrev = -1;
-    Sim.substep(s, { lean: 1 }, h, t, Sim.FIXED_DT);
-    return s.omega;
-  };
-  assert.ok(omegaWith(12) > omegaWith(0) && omegaWith(0) > omegaWith(-12));
-});
-
 test('mud slows the bike', () => {
   const b = byId('surron-lbx');
   const h = Sim.deriveHandling(b);

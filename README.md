@@ -37,9 +37,8 @@ There's no build step and nothing to install. The display fonts load from Google
 
 Pick them in the garage. **Sunset** starts in daylight and runs into the night over about a minute; dawn does the opposite, and day and night barely change. The sky, mesas and ground colours follow the sun. When it gets dark the bike's headlight clicks on (it points wherever the bike points, so it lights up the sky in a big wheelie), and the police car's headlights and light bar light the track.
 
-- **Windy:** gusts come and go. The tape bellies, windsocks swing, the scrub sways, and dust and leaves blow across the screen. A headwind slows you and lifts the nose; a tailwind does the opposite. The HUD shows the wind's speed and direction.
-- **Rain:** streaks blow sideways with the wind and your speed, and splash on the ground. The track gets wet (less grip), puddles fill with water (even less grip, and a rooster tail of spray), and the dust settles.
-- **Storm:** heavy rain, strong wind, dark clouds, lightning flashes, and thunder that rolls in a moment later.
+- **Rain:** streaks slant with your speed and splash on the ground. The track gets wet (less grip), puddles fill with water (even less grip, and a rooster tail of spray), and the dust settles.
+- **Storm:** heavy rain, dark clouds, lightning flashes, and thunder that rolls in a moment later.
 - **Random** picks one of these each run.
 
 ## The bikes
@@ -102,7 +101,9 @@ Anything that moves or can be upgraded is cut out of the trace and drawn by code
 
 The rider is drawn in motocross gear (helmet with peak and goggles, neck brace, jersey, knee braces, boots). Knees and elbows are placed with two-bone IK, so the same rider fits every bike's seat, pegs and bars, and leaning moves the hips and torso. Each bike has a matching rider kit.
 
-The track is a desert motocross course: layered mesas, Joshua trees, course tape and windsocks, distance boards, dust from the rear tyre, and a shadow under the bike. Both wheels move on their suspension as you ride: the front slides along the fork, the rear swings with the shock, and you can see them soak up landings and bumps.
+The track is a desert motocross course: layered mesas, Joshua trees, course tape, distance boards, dust from the rear tyre, and a shadow under the bike.
+
+Speed is sold with near-field motion: grass and stones in the foreground stream past faster than the track (they're closer to the camera), gravel and pebbles smear into streaks, the stakes blur, speed lines appear, the ground buzzes through the camera, and the edges darken. Air rush rises with speed. The camera barely zooms out at speed (zooming out makes speed read slower), and the bike drifts back on screen so you see further ahead. Both wheels move on their suspension as you ride: the front slides along the fork, the rear swings with the shock, and you can see them soak up landings and bumps.
 
 ## How the physics works
 
@@ -115,7 +116,6 @@ The track is a desert motocross course: layered mesas, Joshua trees, course tape
 - Air drag acts at the centre of mass, so it cancels out of the pitch balance, as on a real bike, and the throttle keeps its bite at top speed. In a wheelie the bike gets an arcade speed boost, which is felt in speed but not in pitch.
 - The pop: snapping into a lean-back on the gas, with the front down or only just up, kicks the nose up. Loading the fork first (leaning forward) makes it bigger.
 - In the air, only the wheels move the bike: gas rotates it nose-up, the brake nose-down.
-- Wind pushes on the rider, high above the centre of mass. A headwind lifts the nose and slows you, a tailwind does the opposite.
 - The police car accelerates to a target speed set from the bike's top speed. The target climbs over time and goes up further when the car falls far behind. The wanted level sets the start, the climb and the catch-up, and from three stars spike strips are laid at least 55 m ahead (about three seconds) and clear of obstacles.
 - It runs at a fixed 240 Hz, so it behaves the same at any frame rate.
 
@@ -132,13 +132,13 @@ js/parts.js       workshop parts: real specs, effects, perks and looks (no DOM)
 js/bikeart.js     traced bike art, wheels, rider and kits (no DOM)
 js/traced/        photo-vectorised bike layers
 tools/            vectorize_bike.py, the photo vectoriser (needs OpenCV)
-js/atmosphere.js  time of day, rain, wind, lightning and lighting
+js/atmosphere.js  time of day, rain, lightning and lighting
 js/render.js      canvas drawing: sky, track, obstacles, police car, gauge
 js/game.js        game loop, input, scoring, HUD, synthesized audio, menus
 tests/            node:test suites for the physics and the art data
 ```
 
-Run the tests with `npm test` (Node 18+). They check that the art's calibration matches the physics (wheelbase and wheel size), that the bike settles on its suspension at rest, that the pop lifts the front quickly and that pinning the throttle loops out but leaves time to react, that the front can come back down and the fork dives under braking, that a hard landing is absorbed, that a careful rider can hold a wheelie for a minute on every bike, that a wheelie is faster than riding on two wheels, that a tyre stack crashes you unless you pop over it, that the police catch a slow rider but not a fast wheelie, that wet ground has less grip and wind pushes the right way, and that the result doesn't depend on frame rate. Higher wanted levels catch a slow rider sooner, and a stinger ends the run unless the front wheel is up.
+Run the tests with `npm test` (Node 18+). They check that the art's calibration matches the physics (wheelbase and wheel size), that the bike settles on its suspension at rest, that the pop lifts the front quickly and that pinning the throttle loops out but leaves time to react, that the front can come back down and the fork dives under braking, that a hard landing is absorbed, that a careful rider can hold a wheelie for a minute on every bike, that a wheelie is faster than riding on two wheels, that a tyre stack crashes you unless you pop over it, that the police catch a slow rider but not a fast wheelie, that wet ground has less grip, and that the result doesn't depend on frame rate. Higher wanted levels catch a slow rider sooner, and a stinger ends the run unless the front wheel is up.
 
 `tests/parts.test.js` covers the workshop:
 - Every slot has a stock option, and a stock build is the stock bike.

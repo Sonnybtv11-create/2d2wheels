@@ -77,8 +77,8 @@
     }
 
     // clouds: thin streaks in fair weather, a heavy deck when it rains;
-    // they drift with the wind
-    const drift = camX * 2 + t * a.wind * 6;
+    // they drift slowly
+    const drift = camX * 2 + t * 4;
     const heavy = a.overcast;
     const lit = Atmo.mix(a.sky[3], '#ffffff', 0.25);
     const n = heavy > 0.3 ? 9 : 7;
@@ -101,10 +101,10 @@
 
     mesas(ctx, w, h, camX * 4, horizon - h * 0.02, h * 0.16, a.mesaFar, 1);
     haze(ctx, w, horizon, h * 0.12, Atmo.rgba(a.haze, 0.35 + a.rain * 0.25));
-    mesas(ctx, w, h, camX * 9, horizon + h * 0.01, h * 0.11, a.mesaNear, 2);
+    mesas(ctx, w, h, camX * 12, horizon + h * 0.01, h * 0.11, a.mesaNear, 2);
     haze(ctx, w, horizon + h * 0.02, h * 0.1, Atmo.rgba(a.haze, 0.28 + a.rain * 0.25));
-    hills(ctx, w, h, camX * 18, horizon + h * 0.06, h * 0.05, a.hills);
-    scrub(ctx, w, camX * 18, horizon + h * 0.06, h * 0.05, h, a.scrub, a.wind, t);
+    hills(ctx, w, h, camX * 30, horizon + h * 0.06, h * 0.05, a.hills);
+    scrub(ctx, w, camX * 30, horizon + h * 0.06, h * 0.05, h, a.scrub);
   }
 
   function haze(ctx, w, y, size, color) {
@@ -152,8 +152,8 @@
     ctx.fill();
   }
 
-  // Creosote bushes and the odd joshua tree on the near ridge, bending in the wind.
-  function scrub(ctx, w, shift, baseY, amp, h, color, wind, t) {
+  // Creosote bushes and the odd joshua tree on the near ridge.
+  function scrub(ctx, w, shift, baseY, amp, h, color) {
     ctx.fillStyle = color;
     ctx.strokeStyle = color;
     const step = 46;
@@ -163,11 +163,8 @@
       const x = k * step - shift + hash(k) * step;
       const y = baseY - amp * (0.6 * Math.sin((x + shift) * 0.004) + 0.3 * Math.sin((x + shift) * 0.011 + 1.3) + 0.4) + 2;
       const s = h * 0.012 * (0.6 + hash(k + 0.3));
-      // lean downwind (a headwind blows towards the left), with gusty flutter
-      const bend = -wind * 0.025 * (1 + 0.35 * Math.sin(t * 4 + k * 1.7));
       ctx.save();
       ctx.translate(x, y);
-      ctx.transform(1, 0, bend, 1, 0, 0);
       if (r < 0.06) {
         // joshua tree: tapered trunk, upturned arms, spiky leaf clusters
         const arms = [[-0.9, -3.6, -1.6, -4.9], [0, -4.2, 0.2, -5.8], [0.8, -3.2, 1.7, -4.4]];
@@ -202,9 +199,9 @@
 
   /* ---------------- track ---------------- */
 
-  // Course tape on stakes, set back from the racing line. The tape bellies
-  // and flutters in the wind; windsocks show which way it's blowing.
-  function drawTrackside(ctx, view, terrain, wind, t) {
+  // Course tape on stakes, set back from the racing line, sagging a little
+  // between them.
+  function drawTrackside(ctx, view, terrain) {
     const { scale, camX, toScreenY, w } = view;
     const x0 = camX - 2, x1 = camX + w / scale + 2;
     const gap = 6;
@@ -214,65 +211,32 @@
       posts.push([(m - camX) * scale, toScreenY(terrain.surface(m)) - lift, m]);
     }
     ctx.lineCap = 'round';
+    const smear = Math.min(scale * 0.4, (view.speed || 0) * scale * 0.008);
     for (const [sx, sy] of posts) {
+      if (smear > 2) {
+        ctx.fillStyle = 'rgba(91,70,54,0.35)';
+        ctx.fillRect(sx - scale * 0.018, sy - scale * 0.85, scale * 0.036 + smear, scale * 0.85);
+      }
       ctx.fillStyle = '#5b4636';
       ctx.fillRect(sx - scale * 0.018, sy - scale * 0.85, scale * 0.036, scale * 0.85);
     }
-    const gust = Math.min(1, Math.abs(wind) / 14);
     for (let i = 0; i < posts.length - 1; i++) {
-      const [ax, ay, am] = posts[i], [bx, by] = posts[i + 1];
-      // the tape bellies out downwind and ripples
-      const belly = -wind * scale * 0.035;
-      const ripple = Math.sin(t * (8 + gust * 10) + am) * scale * 0.08 * gust;
+      const [ax, ay] = posts[i], [bx, by] = posts[i + 1];
       ctx.beginPath();
       ctx.moveTo(ax, ay - scale * 0.72);
-      ctx.bezierCurveTo(ax + (bx - ax) * 0.33 + belly, (ay + by) / 2 - scale * 0.62 + ripple,
-        ax + (bx - ax) * 0.66 + belly, (ay + by) / 2 - scale * 0.62 - ripple, bx, by - scale * 0.72);
+      ctx.bezierCurveTo(ax + (bx - ax) * 0.33, (ay + by) / 2 - scale * 0.62,
+        ax + (bx - ax) * 0.66, (ay + by) / 2 - scale * 0.62, bx, by - scale * 0.72);
       ctx.lineWidth = Math.max(1.5, scale * 0.035);
       ctx.strokeStyle = '#e8e2d6';
       ctx.stroke();
       ctx.setLineDash([scale * 0.18, scale * 0.18]);
-      ctx.lineDashOffset = -t * wind * scale * 0.05;
       ctx.strokeStyle = '#d64528';
       ctx.stroke();
       ctx.setLineDash([]);
     }
-    // windsocks every 60 m
-    for (let m = Math.ceil(x0 / 60) * 60; m <= x1; m += 60) {
-      if (m <= 0) continue;
-      drawWindsock(ctx, (m + 3 - camX) * scale, toScreenY(terrain.surface(m + 3)), scale, wind, t + m);
-    }
   }
 
-  function drawWindsock(ctx, sx, sy, scale, wind, t) {
-    const ph = scale * 2.1;
-    ctx.fillStyle = '#9aa0a6';
-    ctx.fillRect(sx - scale * 0.025, sy - ph, scale * 0.05, ph);
-    // the sock fills and lifts with the wind; it points downwind
-    const strength = Math.min(1, Math.abs(wind) / 12);
-    const dir = wind > 0 ? -1 : 1;
-    const segs = 5, segLen = scale * 0.17;
-    let x = sx, y = sy - ph + scale * 0.05;
-    // 0 = streaming out level, 1 = hanging straight down
-    const droop = Math.min(1, (1 - strength) * 1.1 + 0.08);
-    for (let k = 0; k < segs; k++) {
-      const flap = Math.sin(t * (6 + strength * 8) + k * 0.9) * 0.18 * (0.4 + strength);
-      const a = droop * (Math.PI / 2) * (0.7 + k * 0.08) + flap;
-      const nx = x + Math.cos(a) * segLen * dir, ny = y + Math.sin(a) * segLen;
-      const r0 = scale * (0.11 - k * 0.016), r1 = scale * (0.11 - (k + 1) * 0.016);
-      ctx.beginPath();
-      ctx.moveTo(x, y - r0);
-      ctx.lineTo(nx, ny - r1);
-      ctx.lineTo(nx, ny + r1);
-      ctx.lineTo(x, y + r0);
-      ctx.closePath();
-      ctx.fillStyle = k % 2 ? '#f4f1ea' : '#ff6a2b';
-      ctx.fill();
-      x = nx; y = ny;
-    }
-  }
-
-  function drawGround(ctx, view, terrain, a, wind, t) {
+  function drawGround(ctx, view, terrain, a) {
     const { w, h, scale, camX, toScreenY } = view;
     const x0 = camX - 1, x1 = camX + w / scale + 1;
     const step = Math.max(0.12, 3 / scale);
@@ -308,14 +272,16 @@
       ctx.stroke();
     }
     // pebbles
-    for (let i = Math.floor(x0 * 2); i <= x1 * 2; i++) {
-      if (hash(i) > 0.4) continue;
-      const x = i / 2 + hash(i + 0.5) * 0.5;
+    for (let i = Math.floor(x0 * 3); i <= x1 * 3; i++) {
+      if (hash(i) > 0.55) continue;
+      const x = i / 3 + hash(i + 0.5) * 0.33;
       const sx = (x - camX) * scale;
       const sy = toScreenY(terrain.surface(x)) + scale * (0.12 + hash(i + 1.7) * 1.6);
+      // smeared into streaks at speed
+      const smear = Math.min(scale * 0.5, (view.speed || 0) * scale * 0.006);
       ctx.beginPath();
-      ctx.ellipse(sx, sy, scale * (0.025 + hash(i + 2.2) * 0.035), scale * 0.02, 0, 0, TAU);
-      ctx.fillStyle = hash(i + 4.4) > 0.5 ? 'rgba(212,170,120,0.35)' : 'rgba(55,30,16,0.35)';
+      ctx.ellipse(sx + smear / 2, sy, scale * (0.025 + hash(i + 2.2) * 0.035) + smear, scale * 0.02, 0, 0, TAU);
+      ctx.fillStyle = hash(i + 4.4) > 0.5 ? 'rgba(222,180,130,0.5)' : 'rgba(50,26,14,0.5)';
       ctx.fill();
     }
     ctx.restore();
@@ -334,26 +300,36 @@
     }
     ctx.beginPath();
     pts.forEach(([sx, sy], i) => (i ? ctx.lineTo(sx, sy + scale * 0.1) : ctx.moveTo(sx, sy + scale * 0.1)));
-    ctx.lineWidth = Math.max(1, scale * 0.025);
-    ctx.strokeStyle = DIRT.rut;
+    ctx.lineWidth = Math.max(1.5, scale * 0.03);
+    ctx.strokeStyle = 'rgba(60,32,16,0.55)';
     ctx.setLineDash([scale * 0.9, scale * 0.25, scale * 0.3, scale * 0.4]);
     ctx.lineDashOffset = camX * scale;
     ctx.stroke();
     ctx.setLineDash([]);
 
-    // dry grass tufts on the lip, bending in the wind
+    // loose gravel along the racing line: small, high-contrast flecks the
+    // eye can track as they stream past
+    for (let i = Math.floor(x0 * 5); i <= x1 * 5; i++) {
+      if (hash(i + 3.3) > 0.5) continue;
+      const x = i / 5 + hash(i + 0.9) * 0.2;
+      const sx = (x - camX) * scale;
+      const sy = toScreenY(terrain.surface(x)) + scale * (0.03 + hash(i + 5.1) * 0.22);
+      const smear = Math.min(scale * 0.3, (view.speed || 0) * scale * 0.004);
+      ctx.fillStyle = hash(i + 6.6) > 0.45 ? 'rgba(236,200,150,0.75)' : 'rgba(45,24,12,0.65)';
+      ctx.fillRect(sx, sy, Math.max(2, scale * 0.025) + smear, Math.max(1.5, scale * 0.018));
+    }
+
+    // dry grass tufts on the lip
     ctx.strokeStyle = 'rgba(120,96,52,0.9)';
-    const lean = -wind * 0.012;
     ctx.lineWidth = Math.max(1, scale * 0.012);
     for (let i = Math.floor(x0 * 1.5); i <= x1 * 1.5; i++) {
       if (hash(i + 7.7) > 0.2) continue;
       const x = i / 1.5;
       const sx = (x - camX) * scale, sy = toScreenY(terrain.surface(x));
-      const sway = lean * (1 + 0.5 * Math.sin(t * 5 + i)) * scale;
       ctx.beginPath();
       for (let j = -2; j <= 2; j++) {
         ctx.moveTo(sx + j * scale * 0.02, sy);
-        ctx.lineTo(sx + j * scale * 0.05 + sway * 0.15, sy - scale * (0.1 + hash(i + j) * 0.08));
+        ctx.lineTo(sx + j * scale * 0.05, sy - scale * (0.1 + hash(i + j) * 0.08));
       }
       ctx.stroke();
     }
@@ -450,10 +426,11 @@
     }
   }
 
-  function drawVignette(ctx, w, h) {
-    const g = ctx.createRadialGradient(w / 2, h * 0.55, Math.min(w, h) * 0.35, w / 2, h * 0.55, Math.max(w, h) * 0.8);
+  // Darker edges; tighter and darker at speed, like tunnel vision.
+  function drawVignette(ctx, w, h, fast = 0) {
+    const g = ctx.createRadialGradient(w / 2, h * 0.55, Math.min(w, h) * (0.35 - 0.08 * fast), w / 2, h * 0.55, Math.max(w, h) * 0.8);
     g.addColorStop(0, 'rgba(20,10,20,0)');
-    g.addColorStop(1, 'rgba(20,10,20,0.35)');
+    g.addColorStop(1, `rgba(20,10,20,${(0.35 + 0.2 * fast).toFixed(3)})`);
     ctx.fillStyle = g;
     ctx.fillRect(0, 0, w, h);
   }

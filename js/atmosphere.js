@@ -1,7 +1,7 @@
 /*
- * Time of day and weather: sky colours, light level, stars and moon, rain,
- * lightning and wind-blown debris. `compute` gives the palette for a moment;
- * `Fx` holds the per-run moving parts (raindrops, debris, lightning).
+ * Time of day and weather: sky colours, light level, stars and moon, rain
+ * and lightning. `compute` gives the palette for a moment; `Fx` holds the
+ * per-run moving parts (raindrops, splashes, lightning).
  * Screen space is pixels (y down). No game logic here.
  */
 (function (root) {
@@ -49,7 +49,7 @@
   function compute(tod, weather, t) {
     const sunAlt = Math.sin(((tod - 6) / 12) * Math.PI);
     const p = lerpStop(sunAlt);
-    const overcast = weather.kind === 'storm' ? 0.9 : weather.kind === 'rain' ? 0.7 : weather.kind === 'windy' ? 0.15 : 0;
+    const overcast = weather.kind === 'storm' ? 0.9 : weather.kind === 'rain' ? 0.7 : 0;
     const dayness = smooth(-0.15, 0.25, sunAlt);
     if (overcast) {
       const oc = OVERCAST.day.map((c, k) => mix(OVERCAST.night[k], c, dayness));
@@ -65,7 +65,7 @@
       sun: p.sun, sunVisible: sunAlt > -0.12 && overcast < 0.6,
       stars: (1 - smooth(-0.25, -0.02, sunAlt)) * (1 - overcast * 0.95),
       moon: sunAlt < 0.05 && overcast < 0.85,
-      rain: weather.rain(t), wet: weather.wet, wind: weather.wind(t),
+      rain: weather.rain(t), wet: weather.wet,
       headlights: light < 0.62,
       dirtShade: 1 - (1 - light) * 0.15,
     };
@@ -79,7 +79,6 @@
     return {
       rnd,
       drops: [],      // rain streaks, screen space
-      debris: [],     // wind-blown dust and leaves, screen space
       splashes: [],
       flash: 0,       // lightning flash 0..1
       bolt: null,
@@ -90,11 +89,11 @@
 
   // speedPx: how fast the world scrolls past (px/s, positive = world moving left)
   function updateFx(fx, a, dt, w, h, scale, speed, weatherKind, groundY) {
-    // rain: streaks falling at an angle set by the wind and the bike's speed
+    // rain: streaks falling at an angle set by the bike's speed
     const want = Math.round(a.rain * 260 * (w * h) / 900000);
     while (fx.drops.length < want) fx.drops.push({ x: fx.rnd() * w * 1.3, y: fx.rnd() * h - h, len: 10 + fx.rnd() * 16, v: 900 + fx.rnd() * 500 });
     if (fx.drops.length > want) fx.drops.length = want;
-    const drift = (-a.wind - speed) * scale * 0.35;
+    const drift = -speed * scale * 0.35;
     for (const d of fx.drops) {
       d.y += d.v * dt;
       d.x += drift * dt;
@@ -106,19 +105,6 @@
     }
     for (const s of fx.splashes) s.t += dt;
     fx.splashes = fx.splashes.filter((s) => s.t < 0.3);
-
-    // wind debris: dust streaks and the odd leaf blowing past
-    const gust = Math.abs(a.wind);
-    const wantDebris = Math.round(clamp((gust - 3) / 10, 0, 1) * 40);
-    while (fx.debris.length < wantDebris) fx.debris.push(newDebris(fx, w, h, drift));
-    if (fx.debris.length > wantDebris) fx.debris.length = wantDebris;
-    const vx = (-a.wind - speed) * scale;
-    for (const d of fx.debris) {
-      d.x += vx * d.k * dt;
-      d.y += Math.sin(d.phase += dt * 3) * 20 * dt + d.vy * dt;
-      d.rot += d.spin * dt;
-      if (d.x < -60 || d.x > w + 60 || d.y > h || d.y < -20) Object.assign(d, newDebris(fx, w, h, vx));
-    }
 
     // lightning in storms
     fx.flash = Math.max(0, fx.flash - dt * 3.2);
@@ -139,21 +125,9 @@
     for (let i = 0; i < fx.thunder.length; i++) fx.thunder[i] -= dt;
   }
 
-  function newDebris(fx, w, h, vx) {
-    const leaf = fx.rnd() < 0.3;
-    return {
-      x: vx < 0 ? w + 20 + fx.rnd() * 60 : -20 - fx.rnd() * 60,
-      y: h * (0.35 + fx.rnd() * 0.55),
-      vy: (fx.rnd() - 0.5) * 30,
-      k: 0.6 + fx.rnd() * 0.8, phase: fx.rnd() * TAU,
-      rot: fx.rnd() * TAU, spin: (fx.rnd() - 0.5) * 12,
-      leaf, len: 6 + fx.rnd() * 14,
-    };
-  }
-
   function drawRain(ctx, fx, a, w, h, scale, speed) {
     if (!fx.drops.length) return;
-    const tilt = clamp((-a.wind - speed) * 0.012, -0.9, 0.9);
+    const tilt = clamp(-speed * 0.012, -0.9, 0.9);
     ctx.save();
     ctx.strokeStyle = a.light > 0.5 ? 'rgba(210,220,235,0.45)' : 'rgba(170,185,210,0.35)';
     ctx.lineWidth = 1.2;
@@ -171,31 +145,6 @@
       ctx.beginPath();
       ctx.ellipse(s.x, s.y, r, r * 0.3, 0, Math.PI, TAU);
       ctx.stroke();
-    }
-    ctx.restore();
-  }
-
-  function drawDebris(ctx, fx, a) {
-    if (!fx.debris.length) return;
-    ctx.save();
-    for (const d of fx.debris) {
-      if (d.leaf) {
-        ctx.save();
-        ctx.translate(d.x, d.y);
-        ctx.rotate(d.rot);
-        ctx.fillStyle = a.light > 0.4 ? 'rgba(150,120,60,0.85)' : 'rgba(70,60,40,0.8)';
-        ctx.beginPath();
-        ctx.ellipse(0, 0, 4, 1.8, 0, 0, TAU);
-        ctx.fill();
-        ctx.restore();
-      } else {
-        ctx.strokeStyle = a.light > 0.4 ? 'rgba(225,195,150,0.35)' : 'rgba(120,110,100,0.25)';
-        ctx.lineWidth = 1.5;
-        ctx.beginPath();
-        ctx.moveTo(d.x, d.y);
-        ctx.lineTo(d.x + d.len * Math.sign(a.wind || 1), d.y);
-        ctx.stroke();
-      }
     }
     ctx.restore();
   }
@@ -300,5 +249,5 @@
     ctx.restore();
   }
 
-  root.Atmo = { compute, createFx, updateFx, drawRain, drawDebris, drawLightning, drawLighting, mix, rgba, clamp };
+  root.Atmo = { compute, createFx, updateFx, drawRain, drawLightning, drawLighting, mix, rgba, clamp };
 })(typeof self !== 'undefined' ? self : this);

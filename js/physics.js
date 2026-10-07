@@ -56,7 +56,6 @@
     boostDrag: 0.5,     // drag multiplier in a wheelie
     boost: 0.22,        // extra thrust, as a share of launch acceleration
     boostFrom: 1.0, boostTop: 1.2, // the push fades out between these multiples of top speed
-    wind: 1.2,          // how much the wind's push on the rider pitches the bike
     airThrottle: 2.2, airBrake: 3.5, // rotation in the air from wheel spin-up / braking (rad/s²)
     // The pop: snapping into a lean-back with the front down and the throttle
     // on kicks the nose up (body weight plus the fork's rebound). Dipping
@@ -283,28 +282,20 @@
   }
 
   /* ------------------------------------------------------------------ */
-  /* Conditions: wind and rain over time                                 */
+  /* Conditions: rain over time                                          */
   /* ------------------------------------------------------------------ */
 
-  // kind: clear | windy | rain | storm.  Wind is + for a headwind.
+  // kind: clear | rain | storm.
   function createWeather(seed, kind) {
     const rnd = mulberry32(seed ^ 0x5eed);
-    const ph = [rnd() * 6.28, rnd() * 6.28, rnd() * 6.28, rnd() * 6.28];
-    const windy = kind === 'windy' ? 1 : kind === 'storm' ? 0.85 : kind === 'rain' ? 0.35 : 0.15;
-    const mean = (rnd() < 0.5 ? -1 : 1) * windy * (3 + rnd() * 3);
+    const ph = rnd() * 6.28;
     const rainy = kind === 'rain' ? 0.7 : kind === 'storm' ? 1 : 0;
     return {
       kind,
-      // Steady wind plus slow swings and sharp gusts.
-      wind(t) {
-        const swing = Math.sin(t * 0.07 + ph[0]) * 4 + Math.sin(t * 0.23 + ph[1]) * 2;
-        const gust = Math.max(0, Math.sin(t * 0.9 + ph[2]) * Math.sin(t * 0.31 + ph[3])) * 9;
-        return (mean + swing * windy + Math.sign(mean || 1) * gust * windy) ;
-      },
       // Rain intensity 0..1, with showers coming and going.
       rain(t) {
         if (!rainy) return 0;
-        return clamp(rainy * (0.65 + 0.35 * Math.sin(t * 0.05 + ph[1])), 0, 1);
+        return clamp(rainy * (0.65 + 0.35 * Math.sin(t * 0.05 + ph)), 0, 1);
       },
       // How wet the track is: catches up with the rain over ~20 s.
       wet: rainy ? Math.min(1, rainy * 0.9) : 0,
@@ -312,7 +303,7 @@
     };
   }
 
-  const NO_WEATHER = { kind: 'clear', wind: () => 0, rain: () => 0, wet: 0 };
+  const NO_WEATHER = { kind: 'clear', rain: () => 0, wet: 0 };
 
   /* ------------------------------------------------------------------ */
   /* State                                                                */
@@ -335,7 +326,7 @@
       inWheelie: false, wheelieStartX: 0, wheelieDist: 0, wheelieTime: 0,
       longest: 0, wheelieTotal: 0, distance: 0,
       time: 0, crashT: 0,
-      inMud: false, inPuddle: false, wind: 0,
+      inMud: false, inPuddle: false,
       events: [],                  // impacts etc. for sound and dust; the game drains it
       hit: new Set(),              // obstacles the front wheel has reached
       hitRear: new Set(),          // ... and the rear
@@ -496,10 +487,8 @@
     const regen = perks.has('regen') && !clutchIn && s.throttle < 0.15 && rearDown && s.v > 2 ? 1.6 * (1 - s.throttle / 0.15) : 0;
     const brake = moving ? Math.min(s.brake * brakeMax + regen + assistBrake, Math.max(brakeGrip, regen)) * (s.airborne ? 0 : 1) : 0;
     const roll = moving && !s.airborne ? TUNE.roll * (mud ? TUNE.mudRoll / h.grip.mud : 1) * (s.frontDown ? 1 : 0.6) + (puddle ? 0.4 : 0) : 0;
-    s.wind = env.wind(s.time);
-    const air = s.v + s.wind;
     s.inWheelie = !s.frontDown && rearDown && s.theta > WHEELIE_START;
-    const drag = h.dragK * air * Math.abs(air) * (s.inWheelie ? TUNE.boostDrag : 1);
+    const drag = h.dragK * s.v * s.v * (s.inWheelie ? TUNE.boostDrag : 1);
     const boost = s.inWheelie ? boostAt(h, s.v) : 0;
     let a = drive + boost - brake - roll - drag - (s.airborne ? 0 : G * Math.sin(slope));
     if (s.v <= 0 && a < 0) a = 0;
@@ -539,10 +528,7 @@
       // The arcade boost stands in for the suspension pop and body English a
       // real rider uses to get the front up; it eases off towards top speed.
       const gain = pitchGainAt(h, s.v);
-      // The wind shoves the rider, high above the centre of mass: a
-      // headwind lifts the nose, a tailwind pushes it down.
-      const windPush = TUNE.wind * h.dragK * (air * Math.abs(air) - s.v * s.v);
-      const push = (rearDown ? gain * drive : 0) - TUNE.brakeGain * brake - roll - G * Math.sin(slope) + windPush;
+      const push = (rearDown ? gain * drive : 0) - TUNE.brakeGain * brake - roll - G * Math.sin(slope);
       const geff = G + ay; // gravity felt in the chassis's accelerating frame
       const moment = push * Math.sin(beta) - geff * Math.cos(beta + slope) + Ff * TUNE.frontLever * Math.cos(psi);
       alpha = moment / h.pitchArm - TUNE.pitchDamp * s.omega;

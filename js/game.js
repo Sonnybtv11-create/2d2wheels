@@ -36,7 +36,6 @@
   const WEATHERS = [
     { id: 'random', label: 'Random' },
     { id: 'clear', label: 'Clear' },
-    { id: 'windy', label: 'Windy' },
     { id: 'rain', label: 'Rain' },
     { id: 'storm', label: 'Storm' },
   ];
@@ -55,7 +54,7 @@
   if (!WEATHERS.some((w) => w.id === condWeather)) condWeather = 'random';
   function pickWeather() {
     const r = Math.random();
-    return r < 0.3 ? 'clear' : r < 0.55 ? 'windy' : r < 0.8 ? 'rain' : 'storm';
+    return r < 0.45 ? 'clear' : r < 0.78 ? 'rain' : 'storm';
   }
 
   /* ---------- state ---------- */
@@ -637,7 +636,7 @@
   /* ---------- audio: all synthesized ---------- */
   const audio = (() => {
     let ac = null, out, osc, osc2, gain, filter, roarGain, noiseBuf;
-    let rainGain, windGain, windFilter, sirenOsc, sirenGain, rotorGain;
+    let rainGain, rushGain, rushFilter, sirenOsc, sirenGain, rotorGain;
     let muted = store.get('muted', false);
     const label = () => { $('snd-on').style.display = muted ? 'none' : ''; $('snd-off').style.display = muted ? '' : 'none'; };
     label();
@@ -694,17 +693,17 @@
         const rain = noise(), hp = ac.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 2200;
         rainGain = ac.createGain(); rainGain.gain.value = 0;
         rain.connect(hp); hp.connect(rainGain); rainGain.connect(out);
-        // wind: low, resonant, swelling with the gusts
-        const wind = noise();
-        windFilter = ac.createBiquadFilter(); windFilter.type = 'bandpass'; windFilter.frequency.value = 300; windFilter.Q.value = 1.6;
-        windGain = ac.createGain(); windGain.gain.value = 0;
-        wind.connect(windFilter); windFilter.connect(windGain); windGain.connect(out);
+        // air rushing past the helmet, rising with speed
+        const rush = noise();
+        rushFilter = ac.createBiquadFilter(); rushFilter.type = 'bandpass'; rushFilter.frequency.value = 300; rushFilter.Q.value = 1.2;
+        rushGain = ac.createGain(); rushGain.gain.value = 0;
+        rush.connect(rushFilter); rushFilter.connect(rushGain); rushGain.connect(out);
         // siren
         sirenOsc = ac.createOscillator(); sirenOsc.type = 'square';
         const sf = ac.createBiquadFilter(); sf.type = 'lowpass'; sf.frequency.value = 1600;
         sirenGain = ac.createGain(); sirenGain.gain.value = 0;
         sirenOsc.connect(sf); sf.connect(sirenGain); sirenGain.connect(out);
-        osc.start(); osc2.start(); roar.start(); rain.start(); wind.start(); sirenOsc.start();
+        osc.start(); osc2.start(); roar.start(); rain.start(); rush.start(); sirenOsc.start();
         const rotor = noise(), rf2 = ac.createBiquadFilter(); rf2.type = 'lowpass'; rf2.frequency.value = 160;
         const chop = ac.createGain(); chop.gain.value = 0.5;
         const lfo = ac.createOscillator(); lfo.frequency.value = 11; lfo.type = 'square';
@@ -725,9 +724,9 @@
         gain.gain.setTargetAtTime(riding ? 0.015 + 0.05 * s.throttle : 0, t, 0.05);
         roarGain.gain.setTargetAtTime(riding && !s.airborne ? Math.min(0.06, vr * 0.08) * (s.inPuddle ? 2 : 1) : 0, t, 0.1);
         rainGain.gain.setTargetAtTime(amb * a.rain * 0.05, t, 0.3);
-        const gust = Math.abs(a.wind) + (riding ? s.v * 0.15 : 0);
-        windGain.gain.setTargetAtTime(amb * clamp((gust - 2) / 14, 0, 1) * 0.09, t, 0.2);
-        windFilter.frequency.setTargetAtTime(180 + gust * 22, t, 0.2);
+        const air = riding ? clamp((s.v - 6) / 30, 0, 1) : 0;
+        rushGain.gain.setTargetAtTime(air * air * 0.11, t, 0.15);
+        rushFilter.frequency.setTargetAtTime(250 + air * 900, t, 0.15);
         // siren: a slow wail far off, a fast yelp up close
         const p = s.police;
         let sv = 0;
@@ -967,7 +966,7 @@
         particles.push({
           x: sim.x - 0.1 + Math.random() * 0.1,
           y: groundY + 0.04,
-          vx: -(1 + Math.random() * 2.5) * (0.4 + slip) - atmo.wind * 0.3,
+          vx: -(1 + Math.random() * 2.5) * (0.4 + slip),
           vy: 0.5 + Math.random() * 1.6,
           r: 0.05 + Math.random() * 0.07,
           age: 0, life: 0.7 + Math.random() * 0.9,
@@ -992,7 +991,7 @@
     for (const p of particles) {
       p.age += dt;
       p.vy -= (p.spark ? 9 : 1.2) * dt;
-      p.vx += (-atmo.wind * 0.35 - p.vx) * (p.spark ? 0 : 1.5 * dt);
+      p.vx -= p.vx * (p.spark ? 0 : 1.5 * dt);
       p.x += p.vx * dt;
       p.y += p.vy * dt;
     }
@@ -1182,7 +1181,7 @@
   }
 
   function weatherLabel() {
-    const w = { clear: 'Clear', windy: 'Windy', rain: 'Rain', storm: 'Storm' }[weatherKind];
+    const w = { clear: 'Clear', rain: 'Rain', storm: 'Storm' }[weatherKind];
     return `${timeOf.label} · ${w}`;
   }
 
@@ -1192,20 +1191,25 @@
     // ... and further when the police close in, so you can see them coming
     const p = sim.police;
     const chase = p && p.active && sim.status !== 'crashed' ? clamp((28 - p.gap) / 22, 0, 1) : 0;
-    zoom += ((1 - 0.24 * Math.min(1, sim.v / 28)) * (1 - 0.25 * chase) - zoom) * 0.03;
+    // Speed: only a slight pull-back (zooming out makes speed read slower),
+    // and the bike drifts back on screen so more of the track ahead shows.
+    const fast = sim.status === 'riding' ? clamp((sim.v - 8) / 24, 0, 1) : 0;
+    zoom += ((1 - 0.1 * fast) * (1 - 0.25 * chase) - zoom) * 0.03;
     const scale = Math.min(H / 6.2, W / 5.4) * zoom;
     // slide the bike forward on screen when the police are close, so the car shows
-    const leadWant = (W < 600 ? 0.2 : 0.32) + 0.28 * chase;
+    const leadWant = (W < 600 ? 0.2 : 0.32) - 0.07 * fast * (1 - chase) + 0.28 * chase;
     camLead += (leadWant - camLead) * Math.min(1, dt * 2);
     if (rider) camFocus += ((sim.x + rider.x) / 2 + 1 - camFocus) * 0.08;
     else camFocus = sim.x;
-    const sx = shake > 0 ? (Math.random() - 0.5) * shake * 14 : 0;
-    const sy = shake > 0 ? (Math.random() - 0.5) * shake * 10 : 0;
+    // impacts shake the camera; at speed the ground buzzes through it
+    const buzz = fast * fast * (sim.airborne ? 0.3 : 1);
+    const sx = (shake > 0 ? (Math.random() - 0.5) * shake * 14 : 0) + (Math.random() - 0.5) * buzz * 1.6;
+    const sy = (shake > 0 ? (Math.random() - 0.5) * shake * 10 : 0) + (Math.random() - 0.5) * buzz * 2.4;
     const camX = camFocus - (W * camLead) / scale;
     camY += (terrain.base(camFocus) - camY) * 0.12;
     const groundLine = H * 0.7;
     const toScreenY = (y) => groundLine - (y - camY) * scale + sy;
-    const view = { w: W, h: H, scale, camX: camX - sx / scale, toScreenY };
+    const view = { w: W, h: H, scale, camX: camX - sx / scale, toScreenY, speed: sim.v };
     const toScreen = (x, y) => [(x - view.camX) * scale, toScreenY(y)];
     const a = atmo;
     const horizon = groundLine - scale * 0.4;
@@ -1213,8 +1217,8 @@
     R.drawSky(ctx, W, H, camX, horizon, a, clock);
     // the cruisers that laid the stingers, parked beyond the tape
     for (const st of sim.stingers) R.drawPolice(ctx, view, terrain, { x: st.x + 2.5, active: true }, clock + st.x, { parked: { s: 0.62, lift: 0.75, alpha: 0.9 } });
-    R.drawTrackside(ctx, view, terrain, a.wind, clock);
-    R.drawGround(ctx, view, terrain, a, a.wind, clock);
+    R.drawTrackside(ctx, view, terrain);
+    R.drawGround(ctx, view, terrain, a);
     R.drawFeatures(ctx, view, terrain, a, clock);
     R.drawObstacles(ctx, view, terrain, gone, a);
     for (const st of sim.stingers) R.drawStinger(ctx, view, terrain, st, sim.time);
@@ -1326,7 +1330,6 @@
       }
     }
     Atmo.drawRain(ctx, fx, a, W, H, scale, sim.v);
-    Atmo.drawDebris(ctx, fx, a);
     Atmo.drawLightning(ctx, fx, W, H);
 
     // police lights washing in from off screen
@@ -1337,10 +1340,84 @@
       ctx.fillStyle = g;
       ctx.fillRect(0, 0, W * 0.18, H);
     }
-    R.drawVignette(ctx, W, H);
+    drawForeground(view, groundLine, fast);
+    drawSpeedLines(dt, fast);
+    R.drawVignette(ctx, W, H, fast);
     if (mode === 'play' && sim.status === 'riding') drawIncoming(view);
 
     if (mode === 'play' || mode === 'results') drawHud(view);
+  }
+
+  // Near-camera tufts and stones along the bottom of the screen, moving
+  // faster than the track (they're closer) and smeared at speed.
+  function drawForeground(view, groundLine, fast) {
+    const { scale, camX } = view;
+    const k = 1.7; // parallax: nearer than the track
+    const u0 = camX * k, unit = 1.4;
+    const smear = Math.min(scale * 1.6, view.speed * scale * 0.035);
+    const baseY = H - Math.max(8, (H - groundLine) * 0.08);
+    ctx.save();
+    for (let i = Math.floor(u0 / unit) - 2; i * unit < u0 + W / scale + unit * 2; i++) {
+      const r = fgHash(i);
+      if (r > 0.5) continue;
+      const sx = (i * unit + fgHash(i + 0.31) * unit - u0) * scale;
+      if (sx < -smear - 80 || sx > W + 80) continue;
+      const hgt = scale * (0.3 + fgHash(i + 0.7) * 0.6);
+      ctx.fillStyle = `rgba(28,16,12,${0.55 + 0.25 * fgHash(i + 0.9)})`;
+      if (r < 0.14) {
+        // a stone
+        ctx.beginPath();
+        ctx.ellipse(sx, baseY, hgt * 0.7 + smear * 0.5, hgt * 0.45, 0, Math.PI, 0);
+        ctx.fill();
+      } else {
+        // a grass tuft, its blades raked back by the speed
+        ctx.beginPath();
+        for (let j = -3; j <= 3; j++) {
+          const bx = sx + j * hgt * 0.12;
+          ctx.moveTo(bx - hgt * 0.04, baseY);
+          ctx.lineTo(bx + j * hgt * 0.08 + smear * 0.6, baseY - hgt * (0.7 + fgHash(i + j) * 0.5));
+          ctx.lineTo(bx + hgt * 0.04, baseY);
+        }
+        ctx.fill();
+      }
+      if (smear > 4) {
+        ctx.fillStyle = `rgba(28,16,12,${0.25 * fast})`;
+        ctx.fillRect(sx - hgt * 0.5, baseY - hgt * 0.35, smear * 1.4, hgt * 0.3);
+      }
+    }
+    ctx.fillStyle = 'rgba(28,16,12,0.55)';
+    ctx.fillRect(0, baseY, W, H - baseY);
+    ctx.restore();
+  }
+  function fgHash(n) {
+    const x = Math.sin(n * 91.345 + 7.13) * 47453.5453;
+    return x - Math.floor(x);
+  }
+
+  // Speed lines streaking past once you're really moving.
+  const speedLines = [];
+  function drawSpeedLines(dt, fast) {
+    const want = Math.round(fast * fast * 26);
+    while (speedLines.length < want) speedLines.push({ x: W + Math.random() * W * 0.5, y: Math.random(), len: 0.5 + Math.random(), v: 0.8 + Math.random() * 0.6 });
+    if (speedLines.length > want) speedLines.length = want;
+    if (!want) return;
+    const pxs = sim.v * Math.min(H / 6.2, W / 5.4) * 1.8;
+    ctx.save();
+    ctx.lineCap = 'round';
+    for (const l of speedLines) {
+      l.x -= pxs * l.v * dt;
+      // keep them out of the middle band, where the bike is
+      const y = l.y < 0.5 ? H * (0.06 + l.y * 0.5) : H * (0.78 + (l.y - 0.5) * 0.4);
+      const len = l.len * (60 + 160 * fast);
+      if (l.x + len < 0) { l.x = W + Math.random() * W * 0.3; l.y = Math.random(); }
+      const g = ctx.createLinearGradient(l.x, 0, l.x + len, 0);
+      g.addColorStop(0, `rgba(255,248,235,${(0.28 * fast).toFixed(3)})`);
+      g.addColorStop(1, 'rgba(255,248,235,0)');
+      ctx.strokeStyle = g;
+      ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.moveTo(l.x, y); ctx.lineTo(l.x + len, y); ctx.stroke();
+    }
+    ctx.restore();
   }
 
   function drawDebrisPieces(view) {
@@ -1499,11 +1576,6 @@
     mb.classList.toggle('hot', run.mult >= 4);
     $('hud-speed').textContent = String(Math.round(sim.v * 3.6));
     $('hud-mph').textContent = `${Math.round(sim.v * 2.23694)} mph`;
-    const wv = atmo.wind;
-    const kmh = Math.round(Math.abs(wv) * 3.6);
-    $('wind-arrow').style.transform = wv > 0 ? 'scaleX(-1)' : 'none';
-    $('wind-text').textContent = kmh < 4 ? 'calm' : `${kmh} km/h ${wv > 0 ? 'headwind' : 'tailwind'}`;
-    $('hud-wind').classList.toggle('strong', kmh >= 30);
     const hh = Math.floor(atmo.tod), mm = Math.floor((atmo.tod - hh) * 60);
     $('hud-cond').textContent = `${weatherLabel()} · ${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}`;
     // ride mode and the electronics at work

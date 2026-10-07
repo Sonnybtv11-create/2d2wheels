@@ -79,9 +79,6 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .combo:empty { display: none; }
 .combo.hot { background: var(--accent); color: #241a05; }
 .hud-dim { opacity: 0.7; }
-.hud-wind { display: flex; justify-content: flex-end; align-items: center; gap: 4px; }
-.wind-arrow { display: inline-block; transition: transform 0.4s ease; color: #bfe4ff; }
-.hud-wind.strong { color: #bfe4ff; }
 .best-track { width: clamp(130px, 28vw, 220px); height: 4px; margin: 6px 0 4px; background: rgba(255, 255, 255, 0.22); border-radius: 2px; overflow: hidden; }
 .best-track i { display: block; height: 100%; width: 0; background: var(--accent); }
 .best-track i.beat { background: var(--ok); }
