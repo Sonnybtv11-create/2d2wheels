@@ -473,7 +473,15 @@
     s.brake += clamp((input.brake && !s.launchArmed && !handOff ? 1 : 0) - s.brake, -TUNE.brakeDown * dt, TUNE.brakeUp * dt);
     if (s.launchArmed) { s.brake = 0; s.v = 0; }
     let leanWant = input.lean || 0;
-    if (s.trick === 'drag') leanWant += (dragLean(h) - leanWant) * s.trickK;
+    if (s.trick === 'drag') {
+      // Lower down, getting into a hand drag is a lean back that helps lift
+      // the front; the hang-off position (and its near-vertical balance
+      // point) takes over as the bike comes up towards it.
+      const top = dragContact(h, TUNE.dragBalanceGap);
+      const u = clamp((s.theta - 30 * DEG) / (top - 8 * DEG - 30 * DEG), 0, 1);
+      const target = 1 + (dragLean(h) - 1) * u * u * (3 - 2 * u);
+      leanWant += (target - leanWant) * s.trickK;
+    }
     else if (surfing) leanWant *= 1 + TUNE.surfLean * s.trickK;
     s.lean += clamp(leanWant - s.lean, -TUNE.leanRate * dt, TUNE.leanRate * dt);
     s.braking = s.brake > 0.3;
