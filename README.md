@@ -10,16 +10,28 @@ There's no build step and nothing to install. The display fonts load from Google
 | --- | --- | --- |
 | Throttle | `↑` / `W` / `Space` | GAS |
 | Brake (drops the front) | `↓` / `S` | BRAKE |
-| Lean back / forward | `←` `A` / `→` `D` | ◀ LEAN / LEAN ▶ |
+| Lean back / forward (tuck) | `←` `A` / `→` `D` | ◀ LEAN / LEAN ▶ |
 | Ride mode (power map) | `Q` | MODE |
 | E-Clutch (if fitted) | `Shift` | CLUTCH |
 | Anti-loop on/off (if fitted) | `E` | ASSIST |
 | Retry / Menu / Sound | `R` / `Esc` / `M` | buttons |
 
 - **The pop:** on the gas, snap into a lean-back and the front comes up. Dip forward first to load the fork for a bigger pop. Then hold the wheelie with the throttle and the brake.
-- **The front wheel can come down.** Riding on two wheels is fine, but you're faster on one: in a wheelie the bike slips through the air more easily and can go past its usual top speed. The gauge in the bottom-left shows how far up the front is.
-- **Obstacles:** logs and rocks can be ridden over, but they knock speed off and jolt the suspension. Tyre stacks can't: get the front wheel over them or you go over the bars. Cones get knocked flying. Clearing an obstacle with the front up scores a bonus. A marker on the right edge warns you about the next obstacle before it comes on screen.
-- **Police:** a cruiser sets off a few seconds after you, and it gets faster the longer you ride. After about a minute it's faster than any bike on two wheels, so you need to wheelie to stay ahead. If it reaches you, you're busted. Letting it get within a few metres and then pulling away scores a close call.
+- **Two wheels are fast, one wheel scores.** Hold → on two wheels to **tuck** down over the bars: about 17% more top speed and harder acceleration. A wheelie scores more but is slower, and the higher you hold it the slower you go (a low wheelie keeps close to top speed; one in the ×4 sweet spot is about 60% of it). So it's a trade: tuck to make ground on the police, wheelie to score when you have a gap. The gauge in the bottom-left shows how far up the front is.
+- **Obstacles** ask for one of three things:
+  - **Pop over:** tyre stacks and stingers. Get the front wheel over them or you crash.
+  - **Tuck under:** low pipelines and boom-gate barriers. Front down and hold → to duck under. Sitting up, or with the front up, you hit them.
+  - **Ride over:** logs and rocks. They knock speed off and jolt the suspension.
+
+  Cones just get knocked flying. Clearing a hazard scores a bonus.
+- **Warnings:** every hazard has plenty of warning:
+  - **Trackside signs** about two seconds ahead: yellow for pop, blue for tuck.
+  - **Edge markers** for the next two hazards before they're on screen, saying POP ▲, TUCK ▼ or what you're riding over, with the distance.
+  - **A countdown prompt** for the next hazard that needs an action. It turns green when you're set up right and flashes red if you're late.
+  - **Beeps:** rising for pop, falling for tuck.
+  - **Radar icons:** tuck hazards hang from the top of the strip, pop hazards stand up from it.
+  - **Reflective bands** so hazards show up at night.
+- **Police:** a cruiser sets off a few seconds after you, and it gets faster the longer you ride. After about a minute it's faster than a wheelie can go, and only a tuck stays ahead of it. If it reaches you, you're busted. Letting it get within a few metres and then pulling away scores a close call.
 - **Wanted level** (picked in the garage) sets how hard they come after you, and multiplies every point you score:
 
   | Wanted | What changes | Points |
@@ -31,7 +43,7 @@ There's no build step and nothing to install. The display fonts load from Google
   | ★★★★★ | An unmarked interceptor replaces the cruiser | ×4 |
 - **Scoring:** 1 point per metre on two wheels, 2 on the back wheel and 4 in the sweet spot just under the balance point (the gauge glows). Plus bonuses for obstacles and stingers cleared, cones and close calls. Everything is multiplied by your wanted level, and it all goes into your bank for the workshop.
 - **The strip at the top** shows the police behind you, then the obstacles (tyre stacks in red), mud, whoops and puddles ahead.
-- A run ends when you loop out, go over the bars, hit a tyre stack or a stinger, or get busted. Your best score, furthest distance, points and parts are saved in the browser.
+- A run ends when you loop out, go over the bars, hit a tyre stack, a stinger, a pipe or a barrier, or get busted. Your best score, furthest distance, points and parts are saved in the browser.
 
 ### Time of day and weather
 
@@ -113,7 +125,7 @@ Speed is sold with near-field motion: grass and stones in the foreground stream 
 - Each wheel follows the ground under it, allowing for the tyre's curve, so bumps, logs and rocks push the wheel up through its suspension. Landing on the front loads the fork and the nose bounces; braking hard with both wheels down dives the fork.
 - Drive force at the rear tyre lifts the nose and the brake pulls it down. Gravity pulls the nose down until the centre of mass passes over the rear axle (the balance point), and past that it pulls the bike over. Gravity is felt in the chassis's accelerating frame, so a compression lightens the nose and a drop off a crest makes it heavy.
 - Rear grip depends on the load on the rear tyre and on the surface: dry, wet, mud or a puddle. Ask for more than the tyre can give and it spins.
-- Air drag acts at the centre of mass, so it cancels out of the pitch balance, as on a real bike, and the throttle keeps its bite at top speed. In a wheelie the bike gets an arcade speed boost, which is felt in speed but not in pitch.
+- Air drag acts at the centre of mass, so it cancels out of the pitch balance, as on a real bike, and the throttle keeps its bite at top speed. Sitting up in a wheelie adds drag, and a tuck cuts it. A small arcade push in a wheelie (felt in speed, not in pitch) fades out well below top speed, so a high wheelie isn't a crawl but a wheelie is never the fastest way down the track. Holding a wheelie takes throttle feathering that can't also accelerate the bike, which is why higher wheelies are slower. Lying over the tank in a tuck also moves weight forward to keep the front down.
 - The pop: snapping into a lean-back on the gas, with the front down or only just up, kicks the nose up. Loading the fork first (leaning forward) makes it bigger.
 - In the air, only the wheels move the bike: gas rotates it nose-up, the brake nose-down.
 - The police car accelerates to a target speed set from the bike's top speed. The target climbs over time and goes up further when the car falls far behind. The wanted level sets the start, the climb and the catch-up, and from three stars spike strips are laid at least 55 m ahead (about three seconds) and clear of obstacles.

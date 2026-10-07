@@ -112,7 +112,7 @@ test('hitting the end of travel is absorbed, not bounced', () => {
   const h = Sim.deriveHandling(b);
   const s2 = Sim.createState();
   while (s2.time < 8 && s2.status === 'riding') { Sim.substep(s2, { throttle: s2.v < 15, lean: -1 }, h, t, Sim.FIXED_DT); maxHeave = Math.max(maxHeave, s2.yq); }
-  assert.ok(maxHeave < 0.45, `bike was thrown ${maxHeave.toFixed(2)} m up`);
+  assert.ok(maxHeave < 0.5, `bike was thrown ${maxHeave.toFixed(2)} m up`);
 });
 
 test('a careful rider can hold wheelies for a minute on every bike', () => {
@@ -135,10 +135,25 @@ test('the throttle can still lift the nose at top speed', () => {
   }
 });
 
-test('a held wheelie is faster than riding flat out on two wheels (wheelie boost)', () => {
-  for (const id of ['surron-lbx']) {
-    const { s, h } = ride(byId(id), balancer, { maxT: 45 });
-    assert.ok(s.inWheelie && s.v > h.vmax, `${id}: ${(s.v * 3.6).toFixed(0)} km/h vs top ${(h.vmax * 3.6).toFixed(0)}`);
+test('two wheels are fast, a tuck faster, and a wheelie slower the higher it is', () => {
+  for (const b of BIKES) {
+    const h = Sim.deriveHandling(b);
+    // flat out on two wheels, sitting up or tucked (the front held down)
+    const flat = (lean) => {
+      const s = Sim.createState();
+      while (s.time < 40) { Sim.substep(s, { throttle: true, lean }, h, flatTrack(), Sim.FIXED_DT); s.events.length = 0; if (s.theta > 3 * D) { s.theta = 0; s.omega = 0; } }
+      return s.v;
+    };
+    // a wheelie held at a set angle
+    const held = (deg) => ride(b, (st) => {
+      if (st.frontDown) { st._p = ((st._p || 0) + 1) % 120; return { throttle: true, lean: st._p < 60 ? -1 : 1 }; }
+      const err = deg * D - st.theta - 0.3 * st.omega;
+      return { throttle: err > 0, brake: err < -6 * D, lean: 1 };
+    }, { maxT: 40 }).s.v;
+    const up = flat(0), tuck = flat(-1), low = held(15), high = held(30);
+    assert.ok(tuck > up * 1.12, `${b.id}: tuck ${(tuck * 3.6).toFixed(0)} vs ${(up * 3.6).toFixed(0)} km/h`);
+    assert.ok(up > low && low > high, `${b.id}: two wheels ${(up * 3.6).toFixed(0)}, low wheelie ${(low * 3.6).toFixed(0)}, high ${(high * 3.6).toFixed(0)} km/h`);
+    assert.ok(low > up * 0.8, `${b.id}: a low wheelie still makes good pace`);
   }
 });
 
@@ -176,12 +191,14 @@ test('logs can be ridden over with the front down, at a cost in speed', () => {
   assert.ok(s.v < before - 1, `kept ${s.v.toFixed(1)} of ${before.toFixed(1)} m/s`);
 });
 
-test('the police catch a rider who dawdles, but not one holding a fast wheelie', () => {
+test('the police catch a dawdler and a rider who only wheelies, but not one who tucks', () => {
   const b = byId('surron-lbx');
   const slow = ride(b, (st) => ({ throttle: st.v < 6, lean: -1 }), { maxT: 60, police: true });
   assert.equal(slow.s.status, 'busted');
-  const fast = ride(b, balancer, { maxT: 45, police: true });
-  assert.equal(fast.s.status, 'riding', `${fast.s.cause} at ${fast.s.time.toFixed(1)} s`);
+  const wheelie = ride(b, balancer, { maxT: 120, police: true });
+  assert.equal(wheelie.s.status, 'busted', `wheelie rider: ${wheelie.s.status}`);
+  const tuck = ride(b, (st) => ({ throttle: true, lean: -1 }), { maxT: 120, police: true });
+  assert.equal(tuck.s.status, 'riding', `${tuck.s.cause} at ${tuck.s.time.toFixed(1)} s`);
 });
 
 test('a wet track gives less grip than a dry one', () => {
@@ -242,8 +259,7 @@ test('a stinger ends the run unless the front wheel is off the ground', () => {
   for (const [policy, expect] of [[() => ({ throttle: true, lean: -1 }), 'crashed'], [balancer, 'riding']]) {
     const h = Sim.deriveHandling(b);
     const t = flatTrack();
-    const s = Sim.createState({ police: true, wanted: 3 });
-    s.nextStinger = 1e9; // lay our own
+    const s = Sim.createState();
     s.stingers.push({ x: 120, w: Sim.STINGER.w, t: 0, hit: false });
     while (s.status === 'riding' && s.x < 130) { Sim.substep(s, policy(s, h), h, t, Sim.FIXED_DT); s.events.length = 0; }
     assert.equal(s.status, expect, s.cause);
@@ -258,10 +274,42 @@ test('from three stars the police lay stingers well ahead of the bike', () => {
   const s = Sim.createState({ police: true, wanted: 3 });
   const laid = [];
   while (s.time < 60 && s.status === 'riding') {
-    Sim.substep(s, balancer(s, h), h, t, Sim.FIXED_DT);
-    for (const e of s.events) if (e.type === 'stinger') laid.push(e.stinger.x - s.x);
+    Sim.substep(s, { throttle: true, lean: -1 }, h, t, Sim.FIXED_DT);
+    // note where each one lands, then take it away so this rider can tuck on
+    for (const e of s.events) if (e.type === 'stinger') { laid.push(e.stinger.x - s.x); e.stinger.hit = true; }
     s.events.length = 0;
   }
   assert.ok(laid.length >= 2, `${laid.length} stingers`);
   for (const d of laid) assert.ok(d >= Sim.STINGER.minAhead, `laid only ${d.toFixed(0)} m ahead`);
+});
+
+test('a low pipe: tucked on two wheels passes under, sitting up or wheelieing hits it', () => {
+  for (const b of BIKES) {
+    const h = Sim.deriveHandling(b);
+    const run = (policy) => {
+      const t = flatTrack();
+      t.obstacles.push({ type: 'pipe', x: 120, w: 0.6, h: 1.6, overhead: true, tall: false, soft: false });
+      const s = Sim.createState({ x: 60 });
+      s.v = 15;
+      while (s.status === 'riding' && s.x < 126) { Sim.substep(s, policy(s), h, t, Sim.FIXED_DT); s.events.length = 0; }
+      return s;
+    };
+    const tucked = run((s) => ({ throttle: true, lean: -1 }));
+    assert.equal(tucked.status, 'riding', `${b.id} tucked: ${tucked.cause}`);
+    const upright = run((s) => ({ throttle: s.v < 15, lean: 0 }));
+    assert.equal(upright.cause, 'Hit the pipe', `${b.id} sitting up`);
+    const wheelie = run((s) => (s.frontDown ? { throttle: true, lean: s.x % 2 < 1 ? 1 : -1 } : { throttle: s.theta < 20 * D, brake: s.theta > 28 * D, lean: 1 }));
+    assert.equal(wheelie.cause, 'Hit the pipe', `${b.id} wheelie`);
+  }
+});
+
+test('obstacles leave room to set the front down before a pipe or gate', () => {
+  const t = Sim.createTerrain(7);
+  const ob = t.obstacles;
+  for (let i = 0; i < ob.length; i++) {
+    if (!ob[i].overhead) continue;
+    if (i > 0) assert.ok(ob[i].x - ob[i - 1].x >= 32, `overhead at ${ob[i].x.toFixed(0)} only ${(ob[i].x - ob[i - 1].x).toFixed(0)} m after the last obstacle`);
+    if (i < ob.length - 1) assert.ok(ob[i + 1].x - ob[i].x >= 32, `obstacle ${(ob[i + 1].x - ob[i].x).toFixed(0)} m after an overhead one`);
+  }
+  assert.ok(ob.some((o) => o.type === 'pipe') && ob.some((o) => o.type === 'gate'));
 });

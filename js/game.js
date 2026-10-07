@@ -487,7 +487,7 @@
     debris = [];
     gone = new Set();
     stats = { topSpeed: 0, clears: 0, closeCalls: 0, endT: 0 };
-    run = { score: 0, mult: 1, lastX: 0, sweet: false, popups: [], milestone: 0, passedBest: false, danger: false, tips: new Set() };
+    run = { score: 0, mult: 1, lastX: 0, sweet: false, popups: [], milestone: 0, passedBest: false, danger: false, tips: new Set(), warned: new Set() };
     hl = 0; hlOn = false;
     demo.up = true; demo.t = 0;
     camY = terrain.base(0);
@@ -758,6 +758,11 @@
       },
       // the E-Clutch biting: a thunk and a rising whine
       clutch(k) { hit('lowpass', 180, 0.12 * k + 0.04, 0.18); tone('sawtooth', 300, 900, 0.03 * k + 0.01, 0.35); },
+      // hazard warnings: rising two-tone to pop, falling to tuck
+      warn(act) {
+        const [a1, a2] = act === 'up' ? [700, 1050] : [1050, 640];
+        tone('triangle', a1, a1, 0.06, 0.1); tone('triangle', a2, a2, 0.06, 0.14, 0.11);
+      },
       // the stinger warning: a two-tone radio chirp
       alert() { tone('square', 1400, 1400, 0.035, 0.09); tone('square', 1000, 1000, 0.035, 0.09, 0.11); },
       busted() { tone('square', 600, 1300, 0.05, 0.35); tone('square', 1300, 600, 0.05, 0.35, 0.36); },
@@ -789,7 +794,7 @@
   // A point per metre on two wheels, two on the back wheel, four in the sweet
   // spot just under the balance point. Clearing obstacles with the front up
   // scores a bonus, and so does shaking off the police from close range.
-  const CLEAR_POINTS = { log: 40, rock: 30, tyres: 100, stinger: 120 };
+  const CLEAR_POINTS = { log: 40, rock: 30, tyres: 100, stinger: 120, pipe: 70, gate: 70 };
 
   function popup(text, x, y, color, big) {
     run.popups.push({ text, x, y, color, big, age: 0, life: 1.1 });
@@ -859,7 +864,7 @@
       } else if (e.type === 'clear') {
         const o = e.obstacle;
         if (mode === 'play') {
-          const pts = (CLEAR_POINTS[o.type] || 20) * (sim.inWheelie ? 1 : 0.5) * wantedMult;
+          const pts = (CLEAR_POINTS[o.type] || 20) * (sim.inWheelie || o.overhead ? 1 : 0.5) * wantedMult;
           run.score += pts;
           stats.clears++;
           popup(`+${Math.round(pts)}`, o.x, terrain.surface(o.x) + o.h + 0.6, o.tall ? 'rgba(255,197,49,A)' : 'rgba(240,235,225,A)', o.tall);
@@ -1045,9 +1050,13 @@
     const hip = Art.info(bike.id).hip;
     const hw = poseToWorld(before, hip[0], hip[1]);
     const v = vBefore;
-    rider = forward
-      ? { x: hw[0], y: hw[1], vx: v * 0.75 + 1, vy: 2.5 + v * 0.08, rot: before.ang, vrot: -(4 + v * 0.15) }
-      : { x: hw[0], y: hw[1], vx: v * 0.5, vy: 2.5, rot: before.ang, vrot: 3 + v * 0.1 };
+    const overhead = sim.cause === 'Hit the pipe' || sim.cause === 'Hit the barrier';
+    rider = overhead
+      // swept off backwards by the bar, while the bike runs on and goes down
+      ? { x: hw[0], y: hw[1] + 0.2, vx: v * 0.15, vy: 1.5, rot: before.ang, vrot: 5 + v * 0.1 }
+      : forward
+        ? { x: hw[0], y: hw[1], vx: v * 0.75 + 1, vy: 2.5 + v * 0.08, rot: before.ang, vrot: -(4 + v * 0.15) }
+        : { x: hw[0], y: hw[1], vx: v * 0.5, vy: 2.5, rot: before.ang, vrot: 3 + v * 0.1 };
     burst(sim.x, 30);
     shake = Math.max(shake, 0.5);
   }
@@ -1075,7 +1084,10 @@
     const s = sim, h = handling;
     demo.t -= dt;
     if (demo.t <= 0) { demo.up = !demo.up; demo.t = demo.up ? 7 + Math.random() * 6 : 1.5 + Math.random(); }
-    const ahead = terrain.obstaclesNear(s.x + h.wheelbase + 1, s.x + h.wheelbase + 1 + Math.max(4, s.v * 0.5)).some((o) => !o.soft);
+    const near = terrain.obstaclesNear(s.x - 1, s.x + h.wheelbase + 1 + Math.max(6, s.v * 1.4));
+    // a pipe or gate coming: front down and tuck under it
+    if (near.some((o) => o.overhead)) return { throttle: s.theta < 6 * DEG, brake: s.theta > 10 * DEG, lean: -1 };
+    const ahead = terrain.obstaclesNear(s.x + h.wheelbase + 1, s.x + h.wheelbase + 1 + Math.max(4, s.v * 0.5)).some((o) => !o.soft && !o.overhead);
     if (s.frontDown || s.theta < 4 * DEG) {
       const want = (demo.up || ahead) && s.v > 6;
       demo.pulse = ((demo.pulse || 0) + dt) % 0.7;
@@ -1142,6 +1154,7 @@
     shake = Math.max(0, shake - dt);
     if (hintTimer > 0) hintTimer -= dt;
     if (mode === 'play') tips();
+    if (mode === 'play' && sim.status === 'riding') warnBeeps();
 
     draw(dt);
     drawStage(dt);
@@ -1160,10 +1173,11 @@
     const nose = sim.x + handling.wheelbase;
     const next = terrain.obstaclesNear(nose + 3, nose + 3 + Math.max(10, sim.v * 1.2)).find((o) => !o.soft && !gone.has(o));
     if (sim.inWheelie && sim.theta > bal + 2 * DEG) hint('Past the balance point · brake', 0.3, true);
-    else if (p && p.active && p.gap < 12) hint('They\'re on you · wheelie!', 0.3, true);
+    else if (p && p.active && p.gap < 12) hint('They\'re on you · hold → to tuck and pull away', 0.3, true);
+    else if (next && next.overhead && runsThisSession <= 3) once('low' + next.x, 'Low pipe · front down and hold → to tuck under it', 1.6, true);
     else if (next && next.tall && sim.frontDown && runsThisSession <= 3) once('tyres' + next.x, 'Tyre stack · pop the front over it', 1.2, true);
     else if (next && sim.frontDown && runsThisSession <= 1) once('obstacle', 'Snap ← on the gas to pop over it', 1.6);
-    else if (p && p.active && sim.time < 7) once('police', 'Police! Wheelie to outrun them', 2, true);
+    else if (p && p.active && sim.time < 7) once('police', 'Police! Tuck (hold →) on two wheels to outrun them', 2.2, true);
     else if (sim.inWheelie && sim.wheelieDist > 20 && runsThisSession <= 2) once('sweet', 'Sit just under the balance point for ×4', 1.8);
 
     // milestones and the best score
@@ -1217,9 +1231,11 @@
     R.drawSky(ctx, W, H, camX, horizon, a, clock);
     // the cruisers that laid the stingers, parked beyond the tape
     for (const st of sim.stingers) R.drawPolice(ctx, view, terrain, { x: st.x + 2.5, active: true }, clock + st.x, { parked: { s: 0.62, lift: 0.75, alpha: 0.9 } });
+    R.drawSupports(ctx, view, terrain, gone);
     R.drawTrackside(ctx, view, terrain);
     R.drawGround(ctx, view, terrain, a);
     R.drawFeatures(ctx, view, terrain, a, clock);
+    if (mode === 'play') R.drawWarnings(ctx, view, terrain, gone, sim.stingers, sim.v);
     R.drawObstacles(ctx, view, terrain, gone, a);
     for (const st of sim.stingers) R.drawStinger(ctx, view, terrain, st, sim.time);
 
@@ -1243,7 +1259,7 @@
     ctx.rotate(pose.ang);
     ctx.translate(-pose.pivot[0], -pose.pivot[1]);
     Art.drawBike(ctx, bike.id, {
-      style: build.style, lit: hl > 0.5,
+      style: build.style, lit: hl > 0.5, tuck: sim.tuck,
       lean: sim.lean, spin: sim.x / bike.look.wheelRadius, blur: Math.min(1, sim.v / 14),
       rider: !rider, pitch: pose.ang, frontOff: pose.frontOff, rearOff: pose.rearOff,
     });
@@ -1258,6 +1274,7 @@
       ctx.restore();
     }
     drawDebrisPieces(view);
+    R.drawOverhead(ctx, view, terrain, gone, clock);
     R.drawParticles(ctx, view, particles.filter((q) => !(q.r >= 0.05 && !q.spark && q.y < terrain.height(q.x) + 0.6)));
     if (run && mode !== 'menu') R.drawPopups(ctx, view, run.popups);
 
@@ -1305,6 +1322,7 @@
       lights.push({ kind: 'point', x: pol.bar[0], y: pol.bar[1], r: 3.2 * scale, power: p.active ? 0.95 : 0, color: pol.red ? '255,40,40' : '50,110,255', glow: 0.55 });
     }
     Atmo.drawLighting(ctx, a, lights, W, H, DPR, horizon, fx.flash);
+    R.drawReflectors(ctx, view, terrain, gone, sim.stingers, a, clock);
     if (heliLamp && a.light > 0.5) {
       // by day the searchlight is just a faint shaft
       const L = lights[0];
@@ -1343,7 +1361,7 @@
     drawForeground(view, groundLine, fast);
     drawSpeedLines(dt, fast);
     R.drawVignette(ctx, W, H, fast);
-    if (mode === 'play' && sim.status === 'riding') drawIncoming(view);
+    if (mode === 'play' && sim.status === 'riding') { drawIncoming(view); drawPrompt(); }
 
     if (mode === 'play' || mode === 'results') drawHud(view);
   }
@@ -1442,39 +1460,106 @@
     }
   }
 
-  // A marker at the right edge for the next obstacle that's coming but not
-  // yet on screen, about two seconds out.
+  // Hazards ahead of the front wheel (or still overhead), nearest first.
+  function hazardsAhead(range) {
+    const nose = sim.x + handling.wheelbase;
+    const out = [];
+    for (const o of terrain.obstaclesNear(sim.x - 1, nose + range)) {
+      if (o.soft || gone.has(o) || sim.hit.has(o) || !R.HAZARD[o.type]) continue;
+      if (!o.overhead && o.x < nose - 0.3) continue;
+      out.push({ type: o.type, x: o.x, act: R.HAZARD[o.type].act, o });
+    }
+    for (const st of sim.stingers) if (!st.hit && st.x > nose - 0.3 && st.x < nose + range) out.push({ type: 'stinger', x: st.x, act: 'up', o: st });
+    return out.sort((p, q) => p.x - q.x);
+  }
+
+  // Markers at the right edge for the next two hazards not yet on screen,
+  // about three seconds out, saying what to do.
   function drawIncoming(view) {
     const { scale, camX, toScreenY } = view;
     const edge = camX + W / scale;
-    const reach = edge + Math.max(8, sim.v * 2.2);
-    const ob = terrain.obstaclesNear(edge - 0.3, reach).find((q) => !q.soft && !gone.has(q));
-    const sg = sim.stingers.find((q) => !q.hit && q.x > edge - 0.3 && q.x < reach);
-    const o = sg && (!ob || sg.x < ob.x) ? { type: 'stinger', x: sg.x, tall: true } : ob;
-    if (o) {
-      const d = o.x - (sim.x + handling.wheelbase);
-      const k = clamp((reach - o.x) / (reach - edge), 0, 1);
-      const y = clamp(toScreenY(terrain.surface(o.x)) - 34, 60, H - 60);
-      const x = W - 30;
-      const pulse = o.tall ? 0.75 + 0.25 * Math.sin(clock * 14) : 1;
+    const reach = Math.max(25, sim.v * 3.2);
+    const list = hazardsAhead(edge - sim.x + reach).filter((z) => z.x > edge - 0.5).slice(0, 2);
+    const narrow = W < 720;
+    let y = clamp(toScreenY(terrain.surface(edge)) - 150, narrow ? 250 : 90, H - 200);
+    list.forEach((z, i) => {
+      const d = z.x - (sim.x + handling.wheelbase);
+      const k = clamp((edge + reach - z.x) / reach, 0, 1);
+      const col = R.ACT_COLOR[z.act];
+      const urgent = z.act !== 'ride';
+      const pulse = urgent ? 0.8 + 0.2 * Math.sin(clock * 12) : 1;
+      const w = i ? 104 : 124, h = i ? 46 : 56;
+      const x = W - w - 10;
       ctx.save();
-      ctx.globalAlpha = (0.35 + 0.65 * k) * pulse;
-      ctx.translate(x, y);
-      ctx.fillStyle = o.tall ? '#ff4d4d' : 'rgba(246,239,229,0.92)';
+      ctx.globalAlpha = (0.5 + 0.5 * k) * (i ? 0.75 : 1) * pulse;
+      ctx.fillStyle = 'rgba(16,10,14,0.82)';
       ctx.beginPath();
-      ctx.moveTo(20, 0); ctx.lineTo(6, -15); ctx.lineTo(-18, -15); ctx.lineTo(-18, 15); ctx.lineTo(6, 15); ctx.closePath();
+      ctx.roundRect ? ctx.roundRect(x, y, w, h, 9) : ctx.rect(x, y, w, h);
       ctx.fill();
-      ctx.fillStyle = o.tall ? '#fff' : '#1a1418';
-      ctx.font = `800 13px ${R.FONT}`;
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText(o.type === 'stinger' ? 'SPIKE' : o.tall ? '!' : o.type === 'log' ? 'LOG' : 'ROCK', -4, 1);
-      ctx.fillStyle = o.tall ? '#ff8a8a' : 'rgba(246,239,229,0.9)';
-      ctx.font = `700 12px ${R.FONT}`;
-      ctx.fillText(`${Math.round(d)} m`, -2, 27);
+      ctx.lineWidth = 2;
+      ctx.strokeStyle = col;
+      ctx.stroke();
+      ctx.fillStyle = col;
+      ctx.fillRect(x, y + 8, 4, h - 16);
+      // pointer towards the track ahead
+      ctx.beginPath(); ctx.moveTo(x + w, y + h / 2 - 8); ctx.lineTo(x + w + 9, y + h / 2); ctx.lineTo(x + w, y + h / 2 + 8); ctx.fill();
+      R.drawHazardIcon(ctx, z.type, x + 26, y + h / 2, h * 0.5);
+      ctx.textAlign = 'left';
+      ctx.font = `800 ${i ? 15 : 18}px ${R.FONT}`;
+      ctx.fillText(z.act === 'up' ? 'POP ▲' : z.act === 'down' ? 'TUCK ▼' : R.HAZARD[z.type].name.toUpperCase(), x + 48, y + h / 2 - 2);
+      ctx.font = `700 ${i ? 12 : 13}px ${R.FONT}`;
+      ctx.fillStyle = 'rgba(246,239,229,0.85)';
+      ctx.fillText(`${Math.round(d)} m`, x + 48, y + h / 2 + 15);
       ctx.restore();
+      y += h + 8;
+    });
+  }
+
+  // The countdown prompt for the next hazard that needs an action: what to
+  // do, how long you have, and whether you're set up for it.
+  function drawPrompt() {
+    const nose = sim.x + handling.wheelbase;
+    const z = hazardsAhead(Math.max(12, sim.v * 2.2)).find((q) => q.act !== 'ride');
+    if (!z) return;
+    const tLeft = Math.max(0, (z.x - nose) / Math.max(sim.v, 1));
+    const up = z.act === 'up';
+    const ready = up ? !sim.frontDown && sim.theta > 9 * DEG : sim.tuck > 0.6 && sim.theta < 8 * DEG;
+    const late = !ready && tLeft < 0.8;
+    const col = ready ? '#6fd38a' : late ? (Math.floor(clock * 10) % 2 ? '#ff4d4d' : '#ffffff') : R.ACT_COLOR[z.act];
+    const w = 230, h = 62;
+    const x = (W - w) / 2, y = W < 720 ? H * 0.58 : H * 0.79;
+    ctx.save();
+    ctx.fillStyle = 'rgba(16,10,14,0.78)';
+    ctx.beginPath();
+    ctx.roundRect ? ctx.roundRect(x, y, w, h, 12) : ctx.rect(x, y, w, h);
+    ctx.fill();
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = col;
+    ctx.stroke();
+    R.drawHazardIcon(ctx, z.type, x + 32, y + 28, 32);
+    ctx.fillStyle = col;
+    ctx.textAlign = 'left';
+    ctx.font = `italic 800 26px ${R.FONT}`;
+    const label = ready ? (up ? '▲ FRONT UP ✓' : '▼ TUCKED ✓') : up ? (late ? 'POP NOW!' : '▲ POP') : late ? 'TUCK NOW!' : '▼ TUCK';
+    ctx.fillText(label, x + 62, y + 34);
+    ctx.font = `600 12px ${R.FONT}`;
+    ctx.fillStyle = 'rgba(246,239,229,0.8)';
+    ctx.fillText(up ? `${R.HAZARD[z.type].name}: get the front over it` : `${R.HAZARD[z.type].name}: front down, hold → under it`, x + 62, y + 51);
+    // the time left, as a bar that runs out
+    const frac = clamp(tLeft / 2.2, 0, 1);
+    ctx.fillStyle = col;
+    ctx.fillRect(x + 8, y + h - 5, (w - 16) * frac, 3);
+    ctx.restore();
+  }
+
+  // A beep when a hazard that needs an action comes within three seconds:
+  // rising for pop, falling for tuck.
+  function warnBeeps() {
+    for (const z of hazardsAhead(Math.max(20, sim.v * 3))) {
+      if (z.act === 'ride' || run.warned.has(z.o)) continue;
+      run.warned.add(z.o);
+      audio.warn(z.act);
     }
-    ctx.textBaseline = 'alphabetic';
   }
 
   /* ---------- HUD ---------- */
@@ -1509,9 +1594,15 @@
       const d = o.x - nose;
       const X = toX(o.x - sim.x);
       const fade = d < 0 ? 0.35 : 1;
-      if (o.tall) {
+      if (o.overhead) {
+        // hangs from the top of the strip: tuck under
+        ctx.fillStyle = `rgba(79,210,255,${fade})`;
+        ctx.fillRect(X - 3, y - 11, 6, 9);
+        ctx.beginPath(); ctx.moveTo(X - 4, y - 1); ctx.lineTo(X + 4, y - 1); ctx.lineTo(X, y + 4); ctx.fill();
+      } else if (o.tall) {
         ctx.fillStyle = `rgba(255,77,77,${fade})`;
-        ctx.fillRect(X - 2, y - 8, 4, 16);
+        ctx.fillRect(X - 3, y - 4, 6, 15);
+        ctx.beginPath(); ctx.moveTo(X - 4, y - 4); ctx.lineTo(X + 4, y - 4); ctx.lineTo(X, y - 10); ctx.fill();
       } else if (o.soft) {
         ctx.fillStyle = `rgba(255,130,40,${fade})`;
         ctx.fillRect(X - 1, y - 3, 2, 6);
@@ -1580,6 +1671,7 @@
     $('hud-cond').textContent = `${weatherLabel()} · ${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}`;
     // ride mode and the electronics at work
     const P = build.perks, chips = [];
+    if (sim.tuck > 0.6) chips.push('<span class="on">Tuck</span>');
     if (build.modes.length > 1) chips.push(`<span>${build.modes[modeIdx].name}</span>`);
     if (P.has('traction')) chips.push(`<span class="${sim.spin > 0.2 || (sim.throttle > 0.9 && sim.v < 8) ? 'on' : ''}">TC</span>`);
     if (P.has('antiLoop')) chips.push(`<span class="${assistOff ? 'off' : sim.assist > 0 ? 'hot' : ''}">Anti-loop${assistOff ? ' off' : ''}</span>`);
@@ -1600,7 +1692,7 @@
     get: () => sim && {
       mode, status: sim.status, cause: sim.cause, theta: sim.theta, omega: sim.omega, v: sim.v, lean: sim.lean,
       dist: sim.wheelieDist, time: sim.time, inWheelie: sim.inWheelie, frontDown: sim.frontDown, airborne: sim.airborne,
-      cr: sim.cr, cf: sim.cf, popT: sim.popT, x: sim.x, distance: sim.distance, inPuddle: sim.inPuddle, inMud: sim.inMud,
+      cr: sim.cr, cf: sim.cf, popT: sim.popT, tuck: sim.tuck, throttle: sim.throttle, x: sim.x, distance: sim.distance, inPuddle: sim.inPuddle, inMud: sim.inMud,
       score: run ? run.score : 0, clears: stats ? stats.clears : 0,
       police: sim.police && { gap: sim.police.gap, active: sim.police.active, v: sim.police.v, level: sim.police.level },
       stingers: sim.stingers.filter((q) => !q.hit).map((q) => q.x),

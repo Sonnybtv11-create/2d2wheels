@@ -50,12 +50,17 @@
     forkK: 60, forkC: 9, forkTravel: 0.24,
     rebound: 2.4,       // rebound damping relative to compression damping
     frontLever: 1.6,    // front axle distance over centre-of-mass distance, from the rear axle
-    // Wheelie boost (arcade): while the front is up the bike slips through the
-    // air more easily and gets a small push. Neither is felt in pitch, so the
-    // throttle still steers the wheelie.
-    boostDrag: 0.5,     // drag multiplier in a wheelie
-    boost: 0.22,        // extra thrust, as a share of launch acceleration
-    boostFrom: 1.0, boostTop: 1.2, // the push fades out between these multiples of top speed
+    // Wheelies score, two wheels are fast. Sitting up in a wheelie puts the
+    // rider into the air; tucked down over the bars on two wheels cuts the
+    // drag. Neither is felt in pitch, so the throttle still steers a wheelie.
+    wheelieDrag: 1.12,  // drag multiplier in a wheelie
+    // A small arcade push in a wheelie (not felt in pitch), so a high
+    // wheelie isn't a crawl. It fades out well below top speed, so a wheelie
+    // is never the quickest way down the track.
+    wheelieThrust: 0.14, thrustFade: [0.55, 0.85],
+    tuckDrag: 0.62,     // ... tucked on two wheels: about 17% more top speed
+    tuckRate: 3,        // how quickly the rider gets down into the tuck (1/s)
+    tuckMaxAngle: 8 * DEG,
     airThrottle: 2.2, airBrake: 3.5, // rotation in the air from wheel spin-up / braking (rad/s²)
     // The pop: snapping into a lean-back with the front down and the throttle
     // on kicks the nose up (body weight plus the fork's rebound). Dipping
@@ -122,10 +127,6 @@
     return h.launch * Math.min(1, h.vKnee / Math.max(v, 0.5));
   }
 
-  // Wheelie boost thrust at speed v.
-  function boostAt(h, v) {
-    return TUNE.boost * h.launch * clamp((TUNE.boostTop - v / h.vmax) / (TUNE.boostTop - TUNE.boostFrom), 0, 1);
-  }
 
   function mulberry32(seed) {
     let a = seed >>> 0;
@@ -151,6 +152,11 @@
     rock:  { h: [0.14, 0.26], tall: false },
     tyres: { h: [0.34, 0.38], tall: true },
     cones: { h: [0.3, 0.3], tall: false, soft: true },
+    // Overhead: a pipeline or a barrier arm across the track. `h` is the gap
+    // underneath. A tucked rider fits under; sitting up, or with the front
+    // up, you hit it.
+    pipe:  { h: [1.58, 1.66], overhead: true },
+    gate:  { h: [1.58, 1.62], overhead: true },
   };
 
   function obstacleProfile(o, x) {
@@ -206,10 +212,16 @@
       ox += gap;
       if (inFeature(ox, 6) || bumps.some((b) => Math.abs(b.x - ox) < 3)) continue;
       const r = rnd();
-      const type = r < 0.34 ? 'log' : r < 0.62 ? 'rock' : r < 0.84 ? 'tyres' : 'cones';
+      let type = r < 0.27 ? 'log' : r < 0.49 ? 'rock' : r < 0.67 ? 'tyres' : r < 0.78 ? 'cones' : r < 0.9 ? 'pipe' : 'gate';
+      const prev = obstacles[obstacles.length - 1];
+      // room to set the front down before ducking under, and to pop after
+      if (OBSTACLES[type].overhead && (ox < 150 || (prev && ox - prev.x < 32))) type = 'rock';
+      if (prev && prev.overhead && ox - prev.x < 32) ox = prev.x + 32;
       const k = OBSTACLES[type];
       const hgt = k.h[0] + rnd() * (k.h[1] - k.h[0]);
-      if (type === 'cones') {
+      if (k.overhead) {
+        obstacles.push({ type, x: ox, w: type === 'pipe' ? 0.6 : 0.12, h: hgt, tall: false, soft: false, overhead: true, seed: rnd() });
+      } else if (type === 'cones') {
         for (let i = 0; i < 3; i++) obstacles.push({ type, x: ox + i * 1.6, w: 0.35, h: hgt, tall: false, soft: true, seed: rnd() });
       } else {
         const w = type === 'log' ? hgt : type === 'rock' ? hgt * (2.6 + rnd()) : 0.7;
@@ -320,6 +332,7 @@
       throttle: 0, brake: 0, lean: 0, braking: false,
       spin: 0, // rear wheelspin 0..1
       leanIn: 0, popT: 0, // last lean input, time since the last pop
+      tuck: 0,                     // 0..1, how far down into the tuck the rider is
       mode: '', launchArmed: false, launchT: 0, rev: 0, clutchHeld: false, assist: 0,
       status: 'riding',            // riding | crashed | busted
       cause: '',                   // why the run ended
@@ -470,7 +483,7 @@
     // It looks a little ahead (pitch rate), like the real IMU-based systems,
     // so a fast-rising front is caught before it gets there.
     if (((perks.has('antiLoop') && !input.assistOff) || launching) && !s.frontDown && rearDown) {
-      const limit = balanceAngle(s, h) - (launching ? 18 : 8) * DEG;
+      const limit = balanceAngle(s, h) - (launching ? 11 : 8) * DEG;
       const ahead = s.theta + Math.max(0, s.omega) * 0.3;
       if (ahead > limit) {
         drive *= clamp(1 - (ahead - limit) / (5 * DEG), 0, 1);
@@ -488,9 +501,16 @@
     const brake = moving ? Math.min(s.brake * brakeMax + regen + assistBrake, Math.max(brakeGrip, regen)) * (s.airborne ? 0 : 1) : 0;
     const roll = moving && !s.airborne ? TUNE.roll * (mud ? TUNE.mudRoll / h.grip.mud : 1) * (s.frontDown ? 1 : 0.6) + (puddle ? 0.4 : 0) : 0;
     s.inWheelie = !s.frontDown && rearDown && s.theta > WHEELIE_START;
-    const drag = h.dragK * s.v * s.v * (s.inWheelie ? TUNE.boostDrag : 1);
-    const boost = s.inWheelie ? boostAt(h, s.v) : 0;
-    let a = drive + boost - brake - roll - drag - (s.airborne ? 0 : G * Math.sin(slope));
+    // Tuck: the rider down over the bars, leaning forward with the front
+    // down (or skimming just off the ground under hard drive). It's posture,
+    // so a bump that unloads the rear doesn't break it.
+    const tuckWant = (input.lean || 0) < -0.5 && s.theta < TUNE.tuckMaxAngle;
+    s.tuck = clamp(s.tuck + (tuckWant ? 1 : -1.6) * TUNE.tuckRate * dt, 0, 1);
+    const dragMul = s.inWheelie ? TUNE.wheelieDrag : 1 - (1 - TUNE.tuckDrag) * s.tuck;
+    const drag = h.dragK * s.v * s.v * dragMul;
+    const [f0, f1] = TUNE.thrustFade;
+    const thrust = s.inWheelie ? TUNE.wheelieThrust * h.launch * clamp((f1 - s.v / h.vmax) / (f1 - f0), 0, 1) : 0;
+    let a = drive + thrust - brake - roll - drag - (s.airborne ? 0 : G * Math.sin(slope));
     if (s.v <= 0 && a < 0) a = 0;
     s.a = a;
 
@@ -518,7 +538,8 @@
     }
 
     /* --- pitch about the rear axle --- */
-    const phi = COM_ANGLE + s.lean * h.leanAngle;
+    // lying over the tank in a tuck puts more weight forward than a lean
+    const phi = COM_ANGLE + s.lean * h.leanAngle - s.tuck * 3 * DEG;
     const beta = s.theta + phi;
     let alpha;
     if (s.airborne) {
@@ -553,6 +574,20 @@
     // bottom of the front tyre with the fork hanging free, measured like the ground
     const frontFree = terrain.base(s.x) + s.yq + WB * Math.sin(psi2) - h.forkSag;
     for (const o of terrain.obstaclesNear(Math.min(x0, fx) - 1.5, fx + 1.5)) {
+      if (o.overhead) {
+        // Overhead: anywhere under it, the rider has to be tucked with the
+        // front down. Cleared once the rear wheel is past.
+        if (s.hit.has(o)) continue;
+        const under = o.x + o.w / 2 > s.x - 0.2 && o.x - o.w / 2 < fx + 0.15;
+        if (under && !(s.tuck > 0.6 && s.theta < TUNE.tuckMaxAngle)) {
+          s.events.push({ type: 'impact', obstacle: o, strength: 2.5, end: 'rider', v: s.v });
+          s.v *= 0.5;
+          crash(s, o.type === 'gate' ? 'Hit the barrier' : 'Hit the pipe');
+          return;
+        }
+        if (s.x - 0.2 > o.x + o.w / 2) { s.hit.add(o); s.events.push({ type: 'clear', obstacle: o }); }
+        continue;
+      }
       if (!s.hit.has(o) && Math.abs(fx - o.x) < o.w / 2 + R * 0.35) {
         s.hit.add(o);
         const top = terrain.base(o.x) + o.h;
@@ -647,8 +682,8 @@
     startGap: 60,       // metres behind at the start
     accel: 4.5,         // m/s²
     base: 0.7,          // cruising speed as a share of the bike's top speed at the start
-    ramp: 0.005,        // ... climbing this much per second: faster than any bike on two
-    cap: 1.2,           //     wheels after about a minute, so you have to wheelie
+    ramp: 0.005,        // ... climbing this much per second: past what a wheelie can hold
+    cap: 1.1,           //     after about a minute; only a tuck stays ahead of it
     catchUp: 0.5,       // extra speed share when far behind, so the pressure stays on
     catchFrom: 45,      // ... from this gap (m), reaching full strength 60 m further back
     refCap: 30,         // pace is set from the bike's top speed, capped here (m/s), so the
@@ -662,11 +697,11 @@
   // far behind; at five an interceptor replaces the cruiser.
   const WANTED = [
     null,
-    { startAfter: 7, base: 0.6, ramp: 0.003, cap: 1.05, catchUp: 0.3, catchFrom: 60, mult: 1 },
+    { startAfter: 7, base: 0.6, ramp: 0.003, cap: 1.0, catchUp: 0.3, catchFrom: 60, mult: 1 },
     { mult: 1.5 },
-    { startAfter: 3, base: 0.72, ramp: 0.0055, cap: 1.22, catchFrom: 40, stingers: [24, 36], mult: 2 },
-    { startAfter: 3, base: 0.74, ramp: 0.006, cap: 1.25, catchUp: 0.7, catchFrom: 28, stingers: [18, 28], heli: true, mult: 3 },
-    { startAfter: 2, base: 0.76, ramp: 0.0065, cap: 1.28, catchUp: 0.8, catchFrom: 24, accel: 6, stingers: [14, 22], heli: true, interceptor: true, mult: 4 },
+    { startAfter: 3, base: 0.72, ramp: 0.0055, cap: 1.12, catchFrom: 40, stingers: [24, 36], mult: 2 },
+    { startAfter: 3, base: 0.74, ramp: 0.006, cap: 1.14, catchUp: 0.7, catchFrom: 28, stingers: [18, 28], heli: true, mult: 3 },
+    { startAfter: 2, base: 0.76, ramp: 0.0065, cap: 1.17, catchUp: 0.8, catchFrom: 24, accel: 6, stingers: [14, 22], heli: true, interceptor: true, mult: 4 },
   ];
   const STINGER = { w: 0.5, lead: 3.2, minAhead: 55 };
 
@@ -722,7 +757,7 @@
 
   const api = {
     G, DEG, CRASH_ANGLE, COM_ANGLE, FIXED_DT, FORK_RAKE, TUNE, COP, WANTED, STINGER, OBSTACLES,
-    deriveHandling, driveAt, boostAt, pitchGainAt, wheelOffsets, chassisY,
+    deriveHandling, driveAt, pitchGainAt, wheelOffsets, chassisY,
     createTerrain, createWeather, createState, step, substep, balanceAngle, mulberry32, obstacleProfile,
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;

@@ -101,15 +101,15 @@ test('dropping the E-Clutch kicks the front up harder than a lean pop', () => {
 
 test('Eco mode holds the Sur-Ron near its 47 km/h cap', () => {
   const h = handlingFor(SR, {});
-  const s = ride(h, () => ({ throttle: true, lean: -1, mode: 1 }), { maxT: 20 });
+  const s = ride(h, () => ({ throttle: true, lean: 0, mode: 1 }), { maxT: 20 });
   assert.ok(s.v * 3.6 < 50 && s.v * 3.6 > 40, `${(s.v * 3.6).toFixed(0)} km/h`);
 });
 
 test('launch control beats a raw launch to 50 km/h on the hot-rod Sur-Ron', () => {
   const h = handlingFor(SR, { controller: 'x9000', battery: 'ebmx', motor: 'tm40' });
   const to50 = (policy) => ride(h, policy, { maxT: 8, until: (s) => s.v > 50 / 3.6 });
-  const raw = to50(() => ({ throttle: true, lean: -1 }));
-  const lc = to50((s) => ({ throttle: true, brake: s.time < 0.5, lean: -1 }));
+  const raw = to50(() => ({ throttle: true, lean: 0 }));
+  const lc = to50((s) => ({ throttle: true, brake: s.time < 0.5, lean: 0 }));
   assert.equal(lc.status, 'riding', lc.cause);
   const lcTime = lc.time - 0.5; // timed from letting go of the brake
   assert.ok(lcTime < raw.time - 0.05 || raw.status !== 'riding', `launch ${lcTime.toFixed(2)} s vs raw ${raw.time.toFixed(2)} s (${raw.cause})`);

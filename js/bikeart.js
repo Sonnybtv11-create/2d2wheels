@@ -839,11 +839,12 @@
     return [a[0] + Math.cos(base + sign * ang) * l1, a[1] + Math.sin(base + sign * ang) * l1];
   }
 
-  function pose(art, lean) {
+  function pose(art, lean, tuck = 0) {
     const r = art.rider;
     // Leaning back slides the hips back on the seat and straightens the torso.
-    const hip = [r.hip[0] - 0.1 * lean, r.hip[1] + 0.05 + 0.05 * Math.max(0, -lean)];
-    const torsoAng = ((14 - 18 * lean) * Math.PI) / 180; // forward tilt from vertical
+    // A tuck sits the hips down and lays the chest over the tank.
+    const hip = [r.hip[0] - 0.1 * lean + 0.05 * tuck, r.hip[1] + 0.05 + 0.05 * Math.max(0, -lean) - 0.07 * tuck];
+    const torsoAng = ((14 - 18 * lean + 38 * tuck) * Math.PI) / 180; // forward tilt from vertical
     const tdir = [Math.sin(torsoAng), Math.cos(torsoAng)];
     const fwd = [Math.cos(torsoAng), -Math.sin(torsoAng)];
     const shoulder = [hip[0] + tdir[0] * BODY.torso, hip[1] + tdir[1] * BODY.torso];
@@ -1000,14 +1001,14 @@
   /* Public API                                                          */
   /* ------------------------------------------------------------------ */
 
-  // opts: { lean, spin, blur, rider (bool), pitch, frontOff, rearOff, style, lit }
+  // opts: { lean, spin, blur, rider (bool), pitch, frontOff, rearOff, style, lit, tuck }
   function drawBike(ctx, id, opts = {}) {
     const art = COMPILED[id];
     const spin = -(opts.spin || 0);
     const blur = opts.blur || 0;
     const lean = opts.lean || 0;
     const rider = opts.rider !== false;
-    const p = rider ? pose(art, lean) : null;
+    const p = rider ? pose(art, lean, opts.tuck || 0) : null;
     ctx.lineJoin = 'round';
 
     if (rider) {

@@ -572,7 +572,7 @@
     const { scale, camX, toScreenY, w } = view;
     const x0 = camX - 2, x1 = camX + w / scale + 2;
     for (const o of terrain.obstaclesNear(x0, x1)) {
-      if (gone && gone.has(o)) continue;
+      if ((gone && gone.has(o)) || o.overhead) continue;
       const sx = (o.x - camX) * scale, sy = toScreenY(terrain.surface(o.x));
       const H = o.h * scale, Wd = o.w * scale;
       ctx.save();
@@ -620,6 +620,95 @@
       }
       ctx.restore();
     }
+  }
+
+  // Overhead obstacles, drawn over the bike (they span the track, so their
+  // near side is in front of it). The far-side supports go in drawSupports,
+  // behind everything.
+  function drawOverhead(ctx, view, terrain, gone, t) {
+    const { scale, camX, toScreenY, w } = view;
+    for (const o of terrain.obstaclesNear(camX - 3, camX + w / scale + 3)) {
+      if (!o.overhead || (gone && gone.has(o))) continue;
+      const sx = (o.x - camX) * scale, sy = toScreenY(terrain.surface(o.x));
+      const bottom = sy - o.h * scale;
+      ctx.save();
+      if (o.type === 'pipe') {
+        // a pipeline seen end-on: steel with a flange ring, and a near-side
+        // support coming down in front of the track edge
+        const r = (o.w / 2) * scale;
+        ctx.fillStyle = '#6f6a62';
+        ctx.fillRect(sx - r * 0.35, bottom - r * 0.2, r * 0.7, (sy - bottom) + scale * 0.35);
+        ctx.fillStyle = 'rgba(0,0,0,0.25)';
+        ctx.fillRect(sx + r * 0.1, bottom - r * 0.2, r * 0.25, (sy - bottom) + scale * 0.35);
+        const g = ctx.createLinearGradient(0, bottom - 2 * r, 0, bottom);
+        g.addColorStop(0, '#b58a5c'); g.addColorStop(0.5, '#8a6440'); g.addColorStop(1, '#4e3826');
+        ctx.beginPath(); ctx.arc(sx, bottom - r, r, 0, TAU); ctx.fillStyle = g; ctx.fill();
+        ctx.lineWidth = Math.max(2, r * 0.18); ctx.strokeStyle = '#3a2a1c'; ctx.stroke();
+        ctx.beginPath(); ctx.arc(sx, bottom - r, r * 0.62, 0, TAU);
+        ctx.lineWidth = Math.max(1, r * 0.08); ctx.strokeStyle = 'rgba(255,230,190,0.35)'; ctx.stroke();
+        // yellow-and-black clearance band
+        drawHazardBand(ctx, sx - r * 1.05, bottom - r * 0.32, r * 2.1, r * 0.3);
+      } else {
+        // a boom gate arm swung across the track, foreshortened towards us
+        const blink = Math.floor(t * 2.5) % 2 === 0;
+        const L = scale * 1.4, th = scale * 0.11;
+        ctx.translate(sx, bottom - th);
+        ctx.rotate(0.12);
+        for (let i = 0; i < 7; i++) {
+          ctx.fillStyle = i % 2 ? '#f2f2ee' : '#d8262e';
+          ctx.fillRect(-L / 2 + (i * L) / 7, 0, L / 7 + 0.5, th);
+        }
+        ctx.strokeStyle = 'rgba(0,0,0,0.45)';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(-L / 2, 0, L, th);
+        // a red lamp on the end
+        ctx.beginPath(); ctx.arc(L / 2, th / 2, th * 0.55, 0, TAU);
+        ctx.fillStyle = blink ? '#ff3b3b' : '#5a1212';
+        ctx.fill();
+        if (blink) {
+          const gl = ctx.createRadialGradient(L / 2, th / 2, 0, L / 2, th / 2, th * 3);
+          gl.addColorStop(0, 'rgba(255,60,60,0.5)'); gl.addColorStop(1, 'rgba(255,60,60,0)');
+          ctx.fillStyle = gl; ctx.fillRect(L / 2 - th * 3, th / 2 - th * 3, th * 6, th * 6);
+        }
+      }
+      ctx.restore();
+    }
+  }
+
+  // Far-side supports for overhead obstacles, drawn behind the track tape.
+  function drawSupports(ctx, view, terrain, gone) {
+    const { scale, camX, toScreenY, w } = view;
+    for (const o of terrain.obstaclesNear(camX - 3, camX + w / scale + 3)) {
+      if (!o.overhead || (gone && gone.has(o))) continue;
+      const sx = (o.x - camX) * scale, sy = toScreenY(terrain.surface(o.x)) - scale * 0.5;
+      const bottom = sy - o.h * scale * 0.8;
+      if (o.type === 'pipe') {
+        ctx.fillStyle = '#7d776d';
+        ctx.fillRect(sx - scale * 0.12, bottom, scale * 0.24, sy - bottom + scale * 0.1);
+        ctx.beginPath(); ctx.arc(sx, bottom - o.w * 0.4 * scale, o.w * 0.4 * scale, 0, TAU);
+        ctx.fillStyle = '#6b5039'; ctx.fill();
+      } else {
+        // the gate's post and counterweight
+        ctx.fillStyle = '#d9d9d4';
+        ctx.fillRect(sx - scale * 0.06, sy - scale * 1.25, scale * 0.12, scale * 1.25);
+        ctx.fillStyle = '#2a2b2f';
+        ctx.fillRect(sx - scale * 0.16, sy - scale * 1.3, scale * 0.32, scale * 0.14);
+      }
+    }
+  }
+
+  function drawHazardBand(ctx, x, y, w, h) {
+    ctx.save();
+    ctx.beginPath(); ctx.rect(x, y, w, h); ctx.clip();
+    ctx.fillStyle = '#ffc531'; ctx.fillRect(x, y, w, h);
+    ctx.fillStyle = '#1a1a1c';
+    for (let k = -2; k < w / h + 2; k++) {
+      ctx.beginPath();
+      ctx.moveTo(x + k * h * 1.4, y + h); ctx.lineTo(x + k * h * 1.4 + h * 0.7, y + h);
+      ctx.lineTo(x + k * h * 1.4 + h * 1.4, y); ctx.lineTo(x + k * h * 1.4 + h * 0.7, y);
+      ctx.closePath(); ctx.fill();
+    }
+    ctx.restore();
   }
 
   function drawCone(ctx, scale, hgt) {
@@ -830,27 +919,122 @@
     return [sx + Math.cos(tilt) * 0.9 * scale, sy + Math.sin(tilt) * 0.9 * scale + 0.05 * scale];
   }
 
-  function drawSign(ctx, sx, sy, scale, label) {
-    const ph = scale * 1.1;
+  function drawSign(ctx, sx, sy, scale, label, color = '#ffc531', size = 1) {
+    const ph = scale * 1.1 * size;
     ctx.fillStyle = '#3c2f26';
     ctx.fillRect(sx - scale * 0.025, sy - ph, scale * 0.05, ph);
-    const d = scale * 0.32;
+    const d = scale * 0.32 * size;
     const cy = sy - ph - d * 0.6;
     ctx.save();
     ctx.translate(sx, cy);
     ctx.rotate(Math.PI / 4);
-    ctx.fillStyle = '#ffc531';
+    ctx.fillStyle = color;
     ctx.fillRect(-d / Math.SQRT2, -d / Math.SQRT2, d * Math.SQRT2, d * Math.SQRT2);
     ctx.lineWidth = Math.max(1.5, scale * 0.025);
     ctx.strokeStyle = '#1a1a1c';
     ctx.strokeRect(-d / Math.SQRT2 * 0.85, -d / Math.SQRT2 * 0.85, d * Math.SQRT2 * 0.85, d * Math.SQRT2 * 0.85);
     ctx.restore();
-    ctx.font = `800 ${Math.max(9, Math.round(scale * 0.11))}px ${FONT}`;
+    ctx.font = `800 ${Math.max(9, Math.round(scale * 0.11 * size))}px ${FONT}`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillStyle = '#1a1a1c';
-    ctx.fillText(label, sx, cy + 1);
+    const lines = label.split('\n');
+    lines.forEach((l, i) => ctx.fillText(l, sx, cy + 1 + (i - (lines.length - 1) / 2) * scale * 0.12 * size));
     ctx.textBaseline = 'alphabetic';
+  }
+
+  // What each hazard asks of you. `up`: get the front over it. `down`: front
+  // down and tucked under it. `ride`: you can ride over it, at a cost.
+  const HAZARD = {
+    tyres: { act: 'up', sign: 'TYRES\n▲ POP', name: 'Tyres' },
+    stinger: { act: 'up', sign: 'SPIKES\n▲ POP', name: 'Spikes' },
+    pipe: { act: 'down', sign: 'LOW\n▼ TUCK', name: 'Low pipe' },
+    gate: { act: 'down', sign: 'BARRIER\n▼ TUCK', name: 'Barrier' },
+    log: { act: 'ride', sign: 'LOG', name: 'Log' },
+    rock: { act: 'ride', sign: 'ROCKS', name: 'Rock' },
+  };
+  const ACT_COLOR = { up: '#ffc531', down: '#4fd2ff', ride: '#e9e2d4' };
+
+  // Warning signs by the track, about 2 s (at least 25 m) before each hazard.
+  function drawWarnings(ctx, view, terrain, gone, stingers, speed) {
+    const { scale, camX, toScreenY, w } = view;
+    const lead = Math.max(25, speed * 2);
+    const x0 = camX - 2, x1 = camX + w / scale + 2;
+    const list = terrain.obstaclesNear(x0, x1 + lead).filter((o) => !o.soft && !(gone && gone.has(o)));
+    for (const st of stingers || []) if (!st.hit) list.push({ type: 'stinger', x: st.x });
+    let lastX = -Infinity;
+    list.sort((a, b) => a.x - b.x);
+    for (const o of list) {
+      const H = HAZARD[o.type];
+      if (!H) continue;
+      const x = o.x - lead;
+      if (x < x0 || x > x1 || x - lastX < 4) continue;
+      lastX = x;
+      drawSign(ctx, (x - camX) * scale, toScreenY(terrain.surface(x)), scale, H.sign, H.act === 'down' ? '#4fd2ff' : H.act === 'up' ? '#ffc531' : '#f2ede2', H.act === 'ride' ? 0.85 : 1.15);
+    }
+  }
+
+  // A small picture of a hazard for markers and the radar, centred at
+  // (x, y), about `s` px tall.
+  function drawHazardIcon(ctx, type, x, y, s) {
+    ctx.save();
+    ctx.translate(x, y);
+    if (type === 'tyres') {
+      for (let k = 0; k < 3; k++) {
+        ctx.fillStyle = k === 1 ? '#f2f2ee' : '#1d1e21';
+        ctx.fillRect(-s * 0.35, s * 0.5 - (k + 1) * s / 3, s * 0.7, s / 3 - 1);
+      }
+    } else if (type === 'stinger') {
+      ctx.fillStyle = '#ff8a1a';
+      ctx.beginPath();
+      for (let k = 0; k <= 6; k++) ctx.lineTo(-s * 0.5 + (k * s) / 6, s * 0.4 - (k % 2 ? s * 0.35 : 0));
+      ctx.lineTo(s * 0.5, s * 0.45); ctx.lineTo(-s * 0.5, s * 0.45);
+      ctx.fill();
+    } else if (type === 'pipe') {
+      ctx.fillStyle = '#9a7048';
+      ctx.beginPath(); ctx.arc(0, -s * 0.18, s * 0.3, 0, TAU); ctx.fill();
+      ctx.fillStyle = '#1a1a1c'; ctx.fillRect(-s * 0.5, s * 0.42, s, 2);
+    } else if (type === 'gate') {
+      for (let k = 0; k < 4; k++) { ctx.fillStyle = k % 2 ? '#f2f2ee' : '#d8262e'; ctx.fillRect(-s * 0.5 + (k * s) / 4, -s * 0.3, s / 4, s * 0.18); }
+      ctx.fillStyle = '#1a1a1c'; ctx.fillRect(-s * 0.5, s * 0.42, s, 2);
+    } else if (type === 'log') {
+      ctx.fillStyle = '#6b4a2b'; ctx.beginPath(); ctx.arc(0, s * 0.2, s * 0.26, 0, TAU); ctx.fill();
+      ctx.strokeStyle = '#c99a62'; ctx.lineWidth = 1; ctx.beginPath(); ctx.arc(0, s * 0.2, s * 0.12, 0, TAU); ctx.stroke();
+    } else {
+      ctx.fillStyle = '#8f857a';
+      ctx.beginPath(); ctx.moveTo(-s * 0.45, s * 0.45); ctx.lineTo(-s * 0.2, -s * 0.05); ctx.lineTo(s * 0.15, -s * 0.1); ctx.lineTo(s * 0.45, s * 0.45); ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  // Reflectors: after dark, the hazards' reflective bands catch your light,
+  // so they show up on a black track.
+  function drawReflectors(ctx, view, terrain, gone, stingers, a, t) {
+    const k = Math.max(0, Math.min(1, (0.75 - a.light) / 0.5));
+    if (k <= 0) return;
+    const { scale, camX, toScreenY, w } = view;
+    ctx.save();
+    ctx.globalAlpha = 0.85 * k;
+    for (const o of terrain.obstaclesNear(camX - 2, camX + w / scale + 2)) {
+      if (o.soft || (gone && gone.has(o))) continue;
+      const sx = (o.x - camX) * scale, sy = toScreenY(terrain.surface(o.x));
+      if (o.type === 'tyres') {
+        ctx.fillStyle = '#ff5a3c';
+        ctx.fillRect(sx - o.w * scale * 0.45, sy - o.h * scale * 0.62, o.w * scale * 0.9, Math.max(2, o.h * scale * 0.1));
+      } else if (o.overhead) {
+        drawHazardBand(ctx, sx - scale * 0.4, sy - o.h * scale - scale * 0.06, scale * 0.8, Math.max(3, scale * 0.06));
+      } else {
+        ctx.fillStyle = '#ffd36a';
+        ctx.fillRect(sx - 3, sy - o.h * scale - 4, 6, 3);
+      }
+    }
+    for (const st of stingers || []) {
+      if (st.hit) continue;
+      const sx = (st.x - camX) * scale, sy = toScreenY(terrain.surface(st.x));
+      ctx.fillStyle = Math.floor(t * 6) % 2 ? '#ff8a1a' : '#ffd36a';
+      ctx.fillRect(sx - st.w * scale / 2, sy - 3, st.w * scale, 3);
+    }
+    ctx.restore();
   }
 
   // Floating score text anchored in the world.
@@ -870,5 +1054,5 @@
   }
 
   const Sim = root.WheelieSim;
-  root.Render = { FONT, drawSky, drawTrackside, drawGround, drawFlag, drawShadow, drawParticles, drawVignette, drawGauge, drawFeatures, drawObstacles, drawCone, drawPolice, drawStinger, drawHeli, drawPopups };
+  root.Render = { FONT, drawSky, drawTrackside, drawGround, drawFlag, drawShadow, drawParticles, drawVignette, drawGauge, drawFeatures, drawObstacles, drawOverhead, drawSupports, drawHazardBand, drawWarnings, drawHazardIcon, drawReflectors, HAZARD, ACT_COLOR, drawCone, drawPolice, drawStinger, drawHeli, drawPopups };
 })(typeof self !== 'undefined' ? self : this);
