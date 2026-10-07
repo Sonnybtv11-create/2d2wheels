@@ -256,6 +256,7 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
 .conds { display: grid; gap: 8px; }
 .cond { display: grid; grid-template-columns: 92px minmax(0, 1fr); align-items: center; gap: 10px; }
+.cond[hidden] { display: none; }
 .cond-label { font: 600 12px/1 var(--display); letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); }
 .seg { display: flex; flex-wrap: wrap; gap: 4px; }
 .seg button { font: 700 13px/1 var(--display); letter-spacing: 0.06em; text-transform: uppercase; padding: 7px 10px; border-radius: 6px; }
@@ -305,6 +306,7 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .res-best { font: 700 16px/1.3 var(--display); color: var(--muted); min-height: 1.3em; letter-spacing: 0.04em; text-transform: uppercase; }
 .res-best.new { color: var(--ok); }
 .res-stats { margin: 14px 0 16px; display: grid; gap: 6px; }
+.res-stats div[hidden] { display: none; }
 .res-stats div { display: flex; justify-content: space-between; border-bottom: 1px solid var(--faint); padding-bottom: 6px; }
 .res-stats dt { color: var(--muted); }
 .res-stats dd { margin: 0; font: 700 17px/1.3 var(--display); font-variant-numeric: tabular-nums; }

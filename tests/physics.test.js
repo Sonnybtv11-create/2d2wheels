@@ -313,3 +313,15 @@ test('obstacles leave room to set the front down before a pipe or gate', () => {
   }
   assert.ok(ob.some((o) => o.type === 'pipe') && ob.some((o) => o.type === 'gate'));
 });
+
+test('the airfield is flat and empty, and runs on forever', () => {
+  const t = Sim.createTerrain(3, { airfield: true });
+  assert.equal(t.theme, 'airfield');
+  assert.equal(t.obstacles.length + t.bumps.length + t.features.length, 0);
+  for (const x of [0, 100, 5000, 50000, 1e6]) { assert.equal(t.height(x), 0); assert.equal(t.slope(x), 0); }
+  // a careful rider holds a wheelie on the runway for a minute
+  for (const b of BIKES) {
+    const { s } = ride(b, balancer, { terrain: t, maxT: 60 });
+    assert.equal(s.status, 'riding', `${b.id}: ${s.cause}`);
+  }
+});

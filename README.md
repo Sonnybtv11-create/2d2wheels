@@ -45,6 +45,13 @@ There's no build step and nothing to install. The display fonts load from Google
 - **The strip at the top** shows the police behind you, then the obstacles (tyre stacks in red), mud, whoops and puddles ahead.
 - A run ends when you loop out, go over the bars, hit a tyre stack, a stinger, a pipe or a barrier, or get busted. Your best score, furthest distance, points and parts are saved in the browser.
 
+### Location
+
+- **Desert track:** the full game, with obstacles, police and points for the workshop.
+- **Airfield:** a flat, endless runway with no obstacles and no police, for practising wheelies, pops and tucks at speed.
+  - The runway is asphalt, so it grips a little better and rolls easier than dirt. Edge lights come on at night.
+  - It's practice, so it pays no points. Instead it keeps your longest wheelie and top speed there for each bike.
+
 ### Time of day and weather
 
 Pick them in the garage. **Sunset** starts in daylight and runs into the night over about a minute; dawn does the opposite, and day and night barely change. The sky, mesas and ground colours follow the sun. When it gets dark the bike's headlight clicks on (it points wherever the bike points, so it lights up the sky in a big wheelie), and the police car's headlights and light bar light the track.

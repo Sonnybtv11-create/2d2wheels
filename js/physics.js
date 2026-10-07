@@ -170,13 +170,15 @@
     }
   }
 
-  function createTerrain(seed) {
+  // opts.airfield: a flat, endless runway with nothing on it.
+  function createTerrain(seed, opts = {}) {
     const rnd = mulberry32(seed);
     const p1 = rnd() * 6.28, p2 = rnd() * 6.28, p3 = rnd() * 6.28;
+    const flat = !!opts.airfield;
     // The first stretch is flat so the player can get going.
     const ramp = (x) => clamp((x - 60) / 600, 0, 1);
     // Long rollers only: short, steep waves made high-speed wheelies a lottery.
-    const base = (x) => ramp(x) * (1.1 * Math.sin(x / 41 + p1) + 0.45 * Math.sin(x / 17 + p2) + 0.05 * Math.sin(x / 7 + p3));
+    const base = flat ? () => 0 : (x) => ramp(x) * (1.1 * Math.sin(x / 41 + p1) + 0.45 * Math.sin(x / 17 + p2) + 0.05 * Math.sin(x / 7 + p3));
 
     // Track features: whoops (a run of rhythmic bumps) and mud (drags the
     // bike, so it needs more throttle, which lifts the nose). Puddles fill
@@ -275,8 +277,14 @@
       return false;
     }
 
+    if (flat) { features.length = 0; bumps.length = 0; obstacles.length = 0; }
+
     return {
       bumps, features, obstacles,
+      theme: flat ? 'airfield' : 'desert',
+      // asphalt grips better and rolls easier than dirt
+      grip: flat ? 1.12 : 1,
+      roll: flat ? 0.6 : 1,
       height,
       surface: (x) => base(x) + bumpAt(x), // the dirt itself, without obstacles on it
       base,
@@ -466,7 +474,7 @@
     s.inMud = mud; s.inPuddle = puddle;
     // Grip: the tyre's dry grip, less in the wet (less again for tyres that
     // don't clear water), least in a puddle.
-    const mu = h.grip.dry * (puddle ? 0.45 * h.grip.wet : 1 - (0.25 * env.wet) / h.grip.wet);
+    const mu = (terrain.grip || 1) * h.grip.dry * (puddle ? 0.45 * h.grip.wet : 1 - (0.25 * env.wet) / h.grip.wet);
     const moving = s.v > 0.01;
     let want = s.throttle * driveAt(h, s.v) * mode.power;
     if (mode.cap && s.v > mode.cap / 3.6) want *= clamp(1 - (s.v - mode.cap / 3.6) / 1.5, 0, 1);
@@ -499,7 +507,7 @@
     // Regen: rolling off slows the rear wheel like a light brake.
     const regen = perks.has('regen') && !clutchIn && s.throttle < 0.15 && rearDown && s.v > 2 ? 1.6 * (1 - s.throttle / 0.15) : 0;
     const brake = moving ? Math.min(s.brake * brakeMax + regen + assistBrake, Math.max(brakeGrip, regen)) * (s.airborne ? 0 : 1) : 0;
-    const roll = moving && !s.airborne ? TUNE.roll * (mud ? TUNE.mudRoll / h.grip.mud : 1) * (s.frontDown ? 1 : 0.6) + (puddle ? 0.4 : 0) : 0;
+    const roll = moving && !s.airborne ? TUNE.roll * (terrain.roll || 1) * (mud ? TUNE.mudRoll / h.grip.mud : 1) * (s.frontDown ? 1 : 0.6) + (puddle ? 0.4 : 0) : 0;
     s.inWheelie = !s.frontDown && rearDown && s.theta > WHEELIE_START;
     // Tuck: the rider down over the bars, leaning forward with the front
     // down (or skimming just off the ground under hard drive). It's posture,

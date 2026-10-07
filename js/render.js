@@ -23,7 +23,7 @@
   /* ---------------- sky & backdrop ---------------- */
 
   // a: palette and conditions from Atmo.compute. t: seconds (for twinkle and drift).
-  function drawSky(ctx, w, h, camX, horizon, a, t) {
+  function drawSky(ctx, w, h, camX, horizon, a, t, theme) {
     const sky = ctx.createLinearGradient(0, 0, 0, horizon);
     sky.addColorStop(0, a.sky[0]);
     sky.addColorStop(0.45, a.sky[1]);
@@ -103,8 +103,69 @@
     haze(ctx, w, horizon, h * 0.12, Atmo.rgba(a.haze, 0.35 + a.rain * 0.25));
     mesas(ctx, w, h, camX * 12, horizon + h * 0.01, h * 0.11, a.mesaNear, 2);
     haze(ctx, w, horizon + h * 0.02, h * 0.1, Atmo.rgba(a.haze, 0.28 + a.rain * 0.25));
-    hills(ctx, w, h, camX * 30, horizon + h * 0.06, h * 0.05, a.hills);
-    scrub(ctx, w, camX * 30, horizon + h * 0.06, h * 0.05, h, a.scrub);
+    if (theme === 'airfield') {
+      // flat airfield ground out to the mesas, hangars and the tower on it
+      ctx.fillStyle = a.hills;
+      ctx.fillRect(0, horizon + h * 0.045, w, h);
+      airfieldSkyline(ctx, w, camX * 30, horizon + h * 0.05, h, a);
+    } else {
+      hills(ctx, w, h, camX * 30, horizon + h * 0.06, h * 0.05, a.hills);
+      scrub(ctx, w, camX * 30, horizon + h * 0.06, h * 0.05, h, a.scrub);
+    }
+  }
+
+  // Hangars with curved roofs, a control tower and parked light aircraft,
+  // repeating along the far side of the airfield.
+  function airfieldSkyline(ctx, w, shift, baseY, h, a) {
+    const col = Atmo.mix(a.hills, '#000000', 0.25), lit = Atmo.mix(a.hills, '#ffffff', 0.12);
+    const step = 260;
+    for (let k = Math.floor(shift / step) - 1; k * step - shift < w + step; k++) {
+      const x = k * step - shift + hash(k) * 60;
+      const r = hash(k + 0.5);
+      const u = h * 0.012;
+      ctx.fillStyle = col;
+      if (r < 0.45) {
+        // hangar: a wide arched roof over a wall with a big door
+        const hw = u * (9 + hash(k + 1.1) * 5), hh = u * 4;
+        ctx.beginPath();
+        ctx.moveTo(x - hw, baseY);
+        ctx.lineTo(x - hw, baseY - hh);
+        ctx.quadraticCurveTo(x, baseY - hh - u * 4.5, x + hw, baseY - hh);
+        ctx.lineTo(x + hw, baseY);
+        ctx.closePath();
+        ctx.fill();
+        ctx.fillStyle = lit;
+        ctx.fillRect(x - hw * 0.6, baseY - hh * 0.85, hw * 1.2, hh * 0.85);
+      } else if (r < 0.6) {
+        // control tower: a shaft with a glazed cab on top
+        ctx.fillRect(x - u * 1.2, baseY - u * 11, u * 2.4, u * 11);
+        ctx.beginPath();
+        ctx.moveTo(x - u * 2.6, baseY - u * 11); ctx.lineTo(x + u * 2.6, baseY - u * 11);
+        ctx.lineTo(x + u * 2.1, baseY - u * 13.5); ctx.lineTo(x - u * 2.1, baseY - u * 13.5);
+        ctx.closePath(); ctx.fill();
+        ctx.fillStyle = a.light < 0.5 ? 'rgba(255,220,150,0.9)' : lit;
+        ctx.fillRect(x - u * 2.1, baseY - u * 13.2, u * 4.2, u * 1.6);
+        ctx.fillStyle = col;
+        ctx.fillRect(x - u * 0.15, baseY - u * 16, u * 0.3, u * 2.6);
+        // a red beacon on the mast at night
+        if (a.light < 0.6 && Math.floor(performance.now() / 700 + k) % 2 === 0) {
+          ctx.fillStyle = '#ff4040';
+          ctx.beginPath(); ctx.arc(x, baseY - u * 16.2, u * 0.45, 0, TAU); ctx.fill();
+        }
+      } else if (r < 0.85) {
+        // a parked light aircraft, high wing, side on
+        const s = u * 1.3;
+        ctx.beginPath();
+        ctx.moveTo(x - s * 4, baseY - s * 1.4); ctx.lineTo(x + s * 2.4, baseY - s * 1.8);
+        ctx.quadraticCurveTo(x + s * 3.4, baseY - s * 1.4, x + s * 2.4, baseY - s * 0.8);
+        ctx.lineTo(x - s * 3.6, baseY - s * 1.1);
+        ctx.closePath(); ctx.fill();
+        ctx.fillRect(x - s * 0.6, baseY - s * 2.3, s * 2.4, s * 0.25);
+        ctx.beginPath(); ctx.moveTo(x - s * 3.9, baseY - s * 1.4); ctx.lineTo(x - s * 4.5, baseY - s * 2.8); ctx.lineTo(x - s * 3.7, baseY - s * 2.6); ctx.lineTo(x - s * 3.2, baseY - s * 1.4); ctx.fill();
+        ctx.fillRect(x + s * 0.3, baseY - s * 0.9, s * 0.15, s * 0.9);
+        ctx.fillRect(x + s * 1.6, baseY - s * 0.9, s * 0.15, s * 0.9);
+      }
+    }
   }
 
   function haze(ctx, w, y, size, color) {
@@ -202,6 +263,7 @@
   // Course tape on stakes, set back from the racing line, sagging a little
   // between them.
   function drawTrackside(ctx, view, terrain) {
+    if (terrain.theme === 'airfield') return;
     const { scale, camX, toScreenY, w } = view;
     const x0 = camX - 2, x1 = camX + w / scale + 2;
     const gap = 6;
@@ -237,6 +299,7 @@
   }
 
   function drawGround(ctx, view, terrain, a) {
+    if (terrain.theme === 'airfield') { drawRunway(ctx, view, terrain, a); return; }
     const { w, h, scale, camX, toScreenY } = view;
     const x0 = camX - 1, x1 = camX + w / scale + 1;
     const step = Math.max(0.12, 3 / scale);
@@ -338,6 +401,109 @@
     for (let m = Math.ceil(x0 / 25) * 25; m <= x1; m += 25) {
       if (m <= 0) continue;
       drawBoard(ctx, (m - camX) * scale, toScreenY(terrain.surface(m)), scale, `${m}`);
+    }
+  }
+
+  // The runway: asphalt seen at a low angle, with edge lines, a dashed
+  // centreline, tyre marks, a painted threshold at the start, then dry grass.
+  function drawRunway(ctx, view, terrain, a) {
+    const { w, h, scale, camX, toScreenY } = view;
+    const y0 = toScreenY(0);
+    const band = scale * 0.6;
+    const wetK = 1 - a.wet * 0.35;
+    // grass verge below
+    const g = ctx.createLinearGradient(0, y0 + band, 0, h);
+    g.addColorStop(0, shadeHex('#8a8048', wetK));
+    g.addColorStop(1, shadeHex('#4f4a2a', wetK));
+    ctx.fillStyle = g;
+    ctx.fillRect(0, y0 + band, w, h - y0 - band);
+    // asphalt
+    const ag = ctx.createLinearGradient(0, y0, 0, y0 + band);
+    ag.addColorStop(0, shadeHex('#5a5c61', wetK));
+    ag.addColorStop(1, shadeHex('#3a3c41', wetK));
+    ctx.fillStyle = ag;
+    ctx.fillRect(0, y0, w, band);
+    const x0 = camX - 2, x1 = camX + w / scale + 2;
+    const X = (x) => (x - camX) * scale;
+    // aggregate texture: flecks streaming past
+    for (let i = Math.floor(x0 * 4); i <= x1 * 4; i++) {
+      if (hash(i + 2.2) > 0.6) continue;
+      const smear = Math.min(scale * 0.3, (view.speed || 0) * scale * 0.004);
+      ctx.fillStyle = hash(i + 7.1) > 0.5 ? 'rgba(200,200,205,0.28)' : 'rgba(15,15,18,0.35)';
+      ctx.fillRect(X(i / 4 + hash(i) * 0.25), y0 + band * (0.12 + hash(i + 4.4) * 0.8), Math.max(2, scale * 0.02) + smear, 1.5);
+    }
+    // rubber marks laid down by landings
+    ctx.fillStyle = 'rgba(10,10,12,0.35)';
+    for (let i = Math.floor(x0 / 7); i <= x1 / 7; i++) {
+      if (hash(i + 9.9) > 0.45) continue;
+      ctx.fillRect(X(i * 7 + hash(i) * 3), y0 + band * (0.3 + hash(i + 3.3) * 0.4), scale * (2 + hash(i + 1.1) * 6), Math.max(1.5, band * 0.05));
+    }
+    // edge lines and the centreline dashes (8 m dashes, 6 m gaps)
+    ctx.fillStyle = 'rgba(240,240,236,0.92)';
+    ctx.fillRect(0, y0 + 1, w, Math.max(2, band * 0.05));
+    ctx.fillRect(0, y0 + band - Math.max(2, band * 0.05) - 1, w, Math.max(2, band * 0.05));
+    for (let m = Math.floor(x0 / 14) * 14; m <= x1; m += 14) {
+      ctx.fillRect(X(m), y0 + band * 0.47, scale * 8, Math.max(2, band * 0.06));
+    }
+    // threshold "piano keys" and the runway number at the start
+    if (x0 < 40) {
+      for (let k = 0; k < 8; k++) ctx.fillRect(X(4 + k * 1.2), y0 + band * 0.15, scale * 0.6, band * 0.7);
+      ctx.save();
+      ctx.font = `800 ${Math.round(band * 0.75)}px ${FONT}`;
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('27', X(16), y0 + band * 0.52);
+      ctx.restore();
+    }
+    if (a.wet > 0) {
+      ctx.fillStyle = Atmo.rgba(a.sky[2], 0.22 * a.wet);
+      ctx.fillRect(0, y0, w, band * 0.5);
+    }
+    // the lip of the runway
+    ctx.fillStyle = shadeHex('#6d6f74', wetK);
+    ctx.fillRect(0, y0 - 1, w, 2);
+    // distance boards every 100 m: black with white numbers, like the
+    // runway's distance markers
+    for (let m = Math.ceil(x0 / 100) * 100; m <= x1; m += 100) {
+      if (m <= 0) continue;
+      const sx = X(m), sy = y0 - scale * 0.05;
+      ctx.fillStyle = '#2a2b2f';
+      ctx.fillRect(sx - scale * 0.03, sy - scale * 0.9, scale * 0.06, scale * 0.9);
+      ctx.fillStyle = '#111214';
+      ctx.fillRect(sx - scale * 0.28, sy - scale * 1.35, scale * 0.56, scale * 0.5);
+      ctx.fillStyle = '#f4f4f0';
+      ctx.font = `800 ${Math.max(10, Math.round(scale * 0.32))}px ${FONT}`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(String(m / 100), sx, sy - scale * 1.1);
+      ctx.textBaseline = 'alphabetic';
+    }
+  }
+
+  // Runway edge lights every 12 m along both edges: little posts with a
+  // lamp that glows after dark. Drawn after the darkness, so they shine.
+  function drawRunwayLights(ctx, view, terrain, a) {
+    if (terrain.theme !== 'airfield') return;
+    const { w, scale, camX, toScreenY } = view;
+    const y0 = toScreenY(0);
+    const dark = Math.max(0, Math.min(1, (0.8 - a.light) / 0.5));
+    for (let m = Math.floor((camX - 2) / 12) * 12; m <= camX + w / scale + 2; m += 12) {
+      const sx = (m - camX) * scale;
+      for (const [y, s] of [[y0 - scale * 0.04, 1], [y0 + scale * 0.62, 1.3]]) {
+        ctx.fillStyle = '#2a2b2f';
+        ctx.fillRect(sx - 1.5 * s, y - scale * 0.22 * s, 3 * s, scale * 0.22 * s);
+        const ly = y - scale * 0.24 * s;
+        ctx.fillStyle = dark > 0.1 ? '#fff4d0' : '#d9d2b4';
+        ctx.beginPath(); ctx.arc(sx, ly, Math.max(2, scale * 0.035 * s), 0, TAU); ctx.fill();
+        if (dark > 0.05) {
+          const r = scale * 0.45 * s;
+          const gl = ctx.createRadialGradient(sx, ly, 0, sx, ly, r);
+          gl.addColorStop(0, `rgba(255,236,180,${(0.7 * dark).toFixed(3)})`);
+          gl.addColorStop(1, 'rgba(255,236,180,0)');
+          ctx.fillStyle = gl;
+          ctx.fillRect(sx - r, ly - r, r * 2, r * 2);
+        }
+      }
     }
   }
 
@@ -1054,5 +1220,5 @@
   }
 
   const Sim = root.WheelieSim;
-  root.Render = { FONT, drawSky, drawTrackside, drawGround, drawFlag, drawShadow, drawParticles, drawVignette, drawGauge, drawFeatures, drawObstacles, drawOverhead, drawSupports, drawHazardBand, drawWarnings, drawHazardIcon, drawReflectors, HAZARD, ACT_COLOR, drawCone, drawPolice, drawStinger, drawHeli, drawPopups };
+  root.Render = { FONT, drawSky, drawTrackside, drawGround, drawFlag, drawShadow, drawParticles, drawVignette, drawGauge, drawFeatures, drawRunwayLights, drawObstacles, drawOverhead, drawSupports, drawHazardBand, drawWarnings, drawHazardIcon, drawReflectors, HAZARD, ACT_COLOR, drawCone, drawPolice, drawStinger, drawHeli, drawPopups };
 })(typeof self !== 'undefined' ? self : this);

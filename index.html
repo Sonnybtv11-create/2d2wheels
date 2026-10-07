@@ -15,7 +15,7 @@
 
   <div id="hud" hidden>
     <div class="hud-dist">
-      <div class="hud-label">Score <span id="hud-mult" class="combo"></span></div>
+      <div class="hud-label"><span id="hud-score-label">Score</span> <span id="hud-mult" class="combo"></span></div>
       <div class="hud-big"><span id="hud-score">0</span></div>
       <div class="best-track" aria-hidden="true"><i id="hud-bestfill"></i></div>
       <div class="hud-sub"><span id="hud-dist">0</span> m · wheelie <span id="hud-wheelie">0</span> m</div>
@@ -86,9 +86,10 @@
           <div id="specs" class="specs"></div>
           <div class="best-row"><span>Your best</span><b id="bike-best">No run yet</b></div>
           <div class="conds">
-            <div class="cond"><span class="cond-label" id="lbl-time">Time</span><div class="seg" id="seg-time" role="radiogroup" aria-labelledby="lbl-time"></div></div>
+            <div class="cond"><span class="cond-label" id="lbl-location">Location</span><div class="seg" id="seg-location" role="radiogroup" aria-labelledby="lbl-location"></div></div>
+          <div class="cond"><span class="cond-label" id="lbl-time">Time</span><div class="seg" id="seg-time" role="radiogroup" aria-labelledby="lbl-time"></div></div>
             <div class="cond"><span class="cond-label" id="lbl-weather">Weather</span><div class="seg" id="seg-weather" role="radiogroup" aria-labelledby="lbl-weather"></div></div>
-            <div class="cond"><span class="cond-label" id="lbl-wanted">Wanted</span><div class="seg seg-stars" id="seg-wanted" role="radiogroup" aria-labelledby="lbl-wanted"></div></div>
+            <div class="cond" id="cond-wanted"><span class="cond-label" id="lbl-wanted">Wanted</span><div class="seg seg-stars" id="seg-wanted" role="radiogroup" aria-labelledby="lbl-wanted"></div></div>
             <p class="wanted-desc" id="wanted-desc"></p>
           </div>
         </div>

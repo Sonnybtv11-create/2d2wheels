@@ -48,6 +48,14 @@
     'Interceptor, the lot · ×4 points',
   ];
   let condWanted = clamp(store.get('wanted', 2) | 0, 1, 5);
+  // Where to ride: the desert track, or the airfield (flat, endless, no
+  // obstacles, no police; practice, so it pays no points).
+  const LOCATIONS = [
+    { id: 'track', label: 'Desert track' },
+    { id: 'airfield', label: 'Airfield' },
+  ];
+  let condLocation = store.get('location', 'track') === 'airfield' ? 'airfield' : 'track';
+  const onAirfield = () => condLocation === 'airfield';
   let condTime = store.get('time', 'sunset');
   let condWeather = store.get('weather', 'random');
   if (!TIMES.some((t) => t.id === condTime)) condTime = 'sunset';
@@ -152,11 +160,16 @@
     refreshSeg();
   }
   buildSeg($('seg-time'), TIMES, () => condTime, (id) => { condTime = id; store.set('time', id); });
+  buildSeg($('seg-location'), LOCATIONS, () => condLocation, (id) => { condLocation = id; store.set('location', id); refreshLocation(); });
+  function refreshLocation() {
+    $('cond-wanted').hidden = onAirfield();
+    $('wanted-desc').textContent = onAirfield() ? 'Practice on an endless runway: no obstacles, no police, no points.' : WANTED_INFO[condWanted];
+  }
   buildSeg($('seg-weather'), WEATHERS, () => condWeather, (id) => { condWeather = id; store.set('weather', id); });
   buildSeg($('seg-wanted'), [1, 2, 3, 4, 5].map((n) => ({ id: n, label: '★'.repeat(n) })), () => condWanted, (id) => {
     condWanted = id; store.set('wanted', id); $('wanted-desc').textContent = WANTED_INFO[id];
   });
-  $('wanted-desc').textContent = WANTED_INFO[condWanted];
+  refreshLocation();
 
   const SPEC_MAX = { power: Math.log(80), weight: 130, speed: 150 };
   function specRow(label, value, frac) {
@@ -473,14 +486,15 @@
     modeIdx = 0;
     assistOff = false;
     const seed = (Math.random() * 1e9) | 0;
-    terrain = Sim.createTerrain(seed);
+    terrain = Sim.createTerrain(seed, { airfield: onAirfield() });
     weatherKind = condWeather === 'random' ? pickWeather() : condWeather;
     terrain.env = Sim.createWeather(seed, weatherKind);
     timeOf = TIMES.find((t) => t.id === condTime);
     fx = Atmo.createFx(seed);
-    sim = Sim.createState({ police: !!play, wanted: condWanted, seed });
-    wantedMult = play ? Sim.WANTED[condWanted].mult : 1;
-    heli = play && Sim.WANTED[condWanted].heli ? { x: -30, y: 12, vx: 0, on: false } : null;
+    const chase = play && !onAirfield();
+    sim = Sim.createState({ police: chase, wanted: condWanted, seed });
+    wantedMult = chase ? Sim.WANTED[condWanted].mult : 1;
+    heli = chase && Sim.WANTED[condWanted].heli ? { x: -30, y: 12, vx: 0, on: false } : null;
     rider = null;
     crashPose = null;
     particles = [];
@@ -503,7 +517,7 @@
     runsThisSession++;
     show('menu', false); show('results', false); show('hud', true); show('touch', isTouch);
     $('hud-bike').textContent = bike.name;
-    $('hud-best').textContent = `Best ${fmt(bestScore(bike.id))}`;
+    $('hud-best').textContent = onAirfield() ? `Practice · best wheelie ${fmt(store.get('air.wheelie.' + bike.id, 0))} m` : `Best ${fmt(bestScore(bike.id))}`;
     hint(isTouch ? 'Hold Gas, tap ◀ Lean to pop the front' : 'Hold ↑, tap ← to pop the front', 2.8);
     if (build.perks.has('launch')) setTimeout(() => { if (mode === 'play' && sim.time < 3) hint(isTouch ? 'Launch control: hold Gas and Brake, let go of Brake' : 'Launch control: hold ↑ and ↓, let go of ↓', 2.6); }, 2900);
     $('touch-clutch').hidden = !build.perks.has('clutch');
@@ -515,6 +529,9 @@
 
   function finishRun() {
     mode = 'results';
+    if (onAirfield()) { finishPractice(); return; }
+    $('res-bank').parentElement.hidden = false;
+    $('res-clears').parentElement.hidden = false;
     const prev = bestScore(bike.id);
     const isBest = run.score > prev;
     if (isBest) store.set('hi.' + bike.id, Math.round(run.score));
@@ -525,6 +542,7 @@
     $('res-title').className = 'crash';
     $('res-bike').textContent = `${bike.name} · ${weatherLabel()} · ${'★'.repeat(condWanted)}`;
     $('res-dist').textContent = fmt(run.score);
+    $('res-dist').nextElementSibling.textContent = 'pts';
     $('res-dist-m').textContent = `${fmt(sim.distance)} m · ${stats.endT.toFixed(0)} s`;
     $('res-wheelie').textContent = `${fmt(sim.wheelieTotal)} m · longest ${fmt(sim.longest)} m`;
     $('res-clears').textContent = String(stats.clears) + (stats.closeCalls ? ` · ${stats.closeCalls} close call${stats.closeCalls > 1 ? 's' : ''}` : '');
@@ -540,6 +558,33 @@
     const rb = $('res-best');
     rb.textContent = isBest ? (prev > 0 ? `New best, up from ${fmt(prev)}` : 'New best') : `Best ${fmt(prev)}`;
     rb.className = 'res-best' + (isBest ? ' new' : '');
+    show('results', true); show('touch', false);
+    $('btn-retry').focus({ preventScroll: true });
+  }
+
+  // The airfield's results: no points, just your longest wheelie and top
+  // speed there, against your bests on this bike.
+  function finishPractice() {
+    const kw = 'air.wheelie.' + bike.id, ks = 'air.speed.' + bike.id;
+    const prevW = store.get(kw, 0), prevS = store.get(ks, 0);
+    const top = Math.round(stats.topSpeed * 3.6);
+    const newW = sim.longest > prevW, newS = top > prevS;
+    if (newW) store.set(kw, Math.round(sim.longest));
+    if (newS) store.set(ks, top);
+    $('res-title').textContent = sim.cause || 'Crashed';
+    $('res-title').className = 'crash';
+    $('res-bike').textContent = `${bike.name} · ${weatherLabel()}`;
+    $('res-dist').textContent = fmt(sim.longest);
+    $('res-dist').nextElementSibling.textContent = 'm';
+    $('res-dist-m').textContent = `${fmt(sim.distance)} m · ${stats.endT.toFixed(0)} s`;
+    $('res-wheelie').textContent = `${fmt(sim.wheelieTotal)} m in all`;
+    $('res-clears').parentElement.hidden = true;
+    $('res-speed').textContent = `${top} km/h${newS && prevS ? ' · new best' : ''}`;
+    $('res-bank').parentElement.hidden = true;
+    $('res-shop').textContent = 'Practice: points only count on the desert track.';
+    const rb = $('res-best');
+    rb.textContent = newW ? (prevW ? `Longest wheelie, up from ${fmt(prevW)} m` : 'Longest wheelie') : `Best wheelie here ${fmt(prevW)} m`;
+    rb.className = 'res-best' + (newW ? ' new' : '');
     show('results', true); show('touch', false);
     $('btn-retry').focus({ preventScroll: true });
   }
@@ -1196,7 +1241,7 @@
 
   function weatherLabel() {
     const w = { clear: 'Clear', rain: 'Rain', storm: 'Storm' }[weatherKind];
-    return `${timeOf.label} · ${w}`;
+    return `${onAirfield() ? 'Airfield · ' : ''}${timeOf.label} · ${w}`;
   }
 
   function draw(dt) {
@@ -1228,7 +1273,7 @@
     const a = atmo;
     const horizon = groundLine - scale * 0.4;
 
-    R.drawSky(ctx, W, H, camX, horizon, a, clock);
+    R.drawSky(ctx, W, H, camX, horizon, a, clock, terrain.theme);
     // the cruisers that laid the stingers, parked beyond the tape
     for (const st of sim.stingers) R.drawPolice(ctx, view, terrain, { x: st.x + 2.5, active: true }, clock + st.x, { parked: { s: 0.62, lift: 0.75, alpha: 0.9 } });
     R.drawSupports(ctx, view, terrain, gone);
@@ -1323,6 +1368,7 @@
     }
     Atmo.drawLighting(ctx, a, lights, W, H, DPR, horizon, fx.flash);
     R.drawReflectors(ctx, view, terrain, gone, sim.stingers, a, clock);
+    R.drawRunwayLights(ctx, view, terrain, a);
     if (heliLamp && a.light > 0.5) {
       // by day the searchlight is just a faint shaft
       const L = lights[0];
@@ -1658,12 +1704,14 @@
     void view;
     const r = Math.max(50, Math.min(70, W * 0.09));
     R.drawGauge(ctx, 16 + r * 1.3, H - (isTouch ? 132 : 16) - r * 0.18, r, clamp(sim.theta, 0, Math.PI / 2), Sim.balanceAngle(sim, handling), Sim.CRASH_ANGLE, run && run.sweet);
-    drawRadar();
+    if (!onAirfield()) drawRadar();
     $('hud-dist').textContent = fmt(sim.distance);
     $('hud-wheelie').textContent = fmt(sim.wheelieTotal);
-    $('hud-score').textContent = fmt(run.score);
+    // on the airfield there are no points: show the wheelie you're on
+    $('hud-score-label').textContent = onAirfield() ? 'Wheelie m' : 'Score';
+    $('hud-score').textContent = onAirfield() ? fmt(sim.wheelieDist) : fmt(run.score);
     const mb = $('hud-mult');
-    mb.textContent = run.mult > 1 ? `×${run.mult}` : '';
+    mb.textContent = run.mult > 1 && !onAirfield() ? `×${run.mult}` : '';
     mb.classList.toggle('hot', run.mult >= 4);
     $('hud-speed').textContent = String(Math.round(sim.v * 3.6));
     $('hud-mph').textContent = `${Math.round(sim.v * 2.23694)} mph`;
