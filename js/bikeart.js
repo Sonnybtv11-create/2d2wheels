@@ -843,16 +843,23 @@
     const r = art.rider;
     // Leaning back slides the hips back on the seat and straightens the torso.
     // A tuck sits the hips down and lays the chest over the tank.
-    const hip = [r.hip[0] - 0.1 * lean + 0.05 * tuck, r.hip[1] + 0.05 + 0.05 * Math.max(0, -lean) - 0.07 * tuck];
-    const torsoAng = ((14 - 18 * lean + 38 * tuck) * Math.PI) / 180; // forward tilt from vertical
+    const hip = [r.hip[0] - 0.1 * lean, r.hip[1] + 0.05 + 0.05 * Math.max(0, -lean) - 0.08 * tuck];
+    // (the tuck stops short of putting the shoulders past the grips)
+    const torsoAng = ((14 - 18 * lean + 26 * tuck) * Math.PI) / 180; // forward tilt from vertical
     const tdir = [Math.sin(torsoAng), Math.cos(torsoAng)];
     const fwd = [Math.cos(torsoAng), -Math.sin(torsoAng)];
     const shoulder = [hip[0] + tdir[0] * BODY.torso, hip[1] + tdir[1] * BODY.torso];
     const foot = [r.peg[0] + 0.02, r.peg[1] + 0.035];
     const knee = ik(hip, foot, BODY.thigh, BODY.shin, 1);
     const hand = r.grip;
-    // Elbows up: the elbow sits out in front of the shoulder, as MX riders hold it.
-    const elbow = ik(shoulder, hand, BODY.upper, BODY.fore, 1);
+    // The elbow bends down below the shoulder-to-grip line. A real rider's
+    // elbows bend outward too, which from the side just shortens the arm, so
+    // the bend you see is kept to a few centimetres.
+    const ikElbow = ik(shoulder, hand, BODY.upper, BODY.fore, -1);
+    const mid = [(shoulder[0] + hand[0]) / 2, (shoulder[1] + hand[1]) / 2];
+    const off = [ikElbow[0] - mid[0], ikElbow[1] - mid[1]], offLen = Math.hypot(off[0], off[1]);
+    const maxBend = 0.07;
+    const elbow = offLen > maxBend ? [mid[0] + (off[0] / offLen) * maxBend, mid[1] + (off[1] / offLen) * maxBend] : ikElbow;
     const head = [shoulder[0] + tdir[0] * 0.25 + fwd[0] * 0.04, shoulder[1] + tdir[1] * 0.25 + fwd[1] * 0.04];
     return { hip, shoulder, head, foot, knee, hand, elbow, tdir, fwd, torsoAng };
   }
