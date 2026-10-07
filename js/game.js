@@ -1174,7 +1174,7 @@
     const next = terrain.obstaclesNear(nose + 3, nose + 3 + Math.max(10, sim.v * 1.2)).find((o) => !o.soft && !gone.has(o));
     if (sim.inWheelie && sim.theta > bal + 2 * DEG) hint('Past the balance point · brake', 0.3, true);
     else if (p && p.active && p.gap < 12) hint('They\'re on you · hold → to tuck and pull away', 0.3, true);
-    else if (next && next.overhead && runsThisSession <= 3) once('low' + next.x, 'Low pipe · front down and hold → to tuck under it', 1.6, true);
+    else if (next && next.overhead && runsThisSession <= 3) once('low' + next.x, `${next.type === 'gate' ? 'Barrier' : 'Low pipe'} · front down and hold → to tuck under it`, 1.6, true);
     else if (next && next.tall && sim.frontDown && runsThisSession <= 3) once('tyres' + next.x, 'Tyre stack · pop the front over it', 1.2, true);
     else if (next && sim.frontDown && runsThisSession <= 1) once('obstacle', 'Snap ← on the gas to pop over it', 1.6);
     else if (p && p.active && sim.time < 7) once('police', 'Police! Tuck (hold →) on two wheels to outrun them', 2.2, true);
@@ -1696,7 +1696,7 @@
       score: run ? run.score : 0, clears: stats ? stats.clears : 0,
       police: sim.police && { gap: sim.police.gap, active: sim.police.active, v: sim.police.v, level: sim.police.level },
       stingers: sim.stingers.filter((q) => !q.hit).map((q) => q.x),
-      ahead: terrain.obstaclesNear(sim.x + handling.wheelbase, sim.x + handling.wheelbase + 30).filter((o) => !gone.has(o)).map((o) => ({ type: o.type, x: o.x, h: o.h, tall: o.tall })),
+      ahead: terrain.obstaclesNear(sim.x - 1, sim.x + handling.wheelbase + 30).filter((o) => !gone.has(o)).map((o) => ({ type: o.type, x: o.x, h: o.h, tall: o.tall })),
       frontX: sim.x + handling.wheelbase * Math.cos(sim.theta),
       weather: weatherKind, tod: atmo && atmo.tod, light: atmo && atmo.light, headlight: hl,
       leanAngle: handling.leanAngle, wheelbase: handling.wheelbase,

@@ -60,7 +60,7 @@
     wheelieThrust: 0.14, thrustFade: [0.55, 0.85],
     tuckDrag: 0.62,     // ... tucked on two wheels: about 17% more top speed
     tuckRate: 3,        // how quickly the rider gets down into the tuck (1/s)
-    tuckMaxAngle: 8 * DEG,
+    tuckMaxAngle: 10 * DEG,
     airThrottle: 2.2, airBrake: 3.5, // rotation in the air from wheel spin-up / braking (rad/s²)
     // The pop: snapping into a lean-back with the front down and the throttle
     // on kicks the nose up (body weight plus the fork's rebound). Dipping
@@ -539,7 +539,7 @@
 
     /* --- pitch about the rear axle --- */
     // lying over the tank in a tuck puts more weight forward than a lean
-    const phi = COM_ANGLE + s.lean * h.leanAngle - s.tuck * 3 * DEG;
+    const phi = COM_ANGLE + s.lean * h.leanAngle - s.tuck * 8 * DEG;
     const beta = s.theta + phi;
     let alpha;
     if (s.airborne) {
