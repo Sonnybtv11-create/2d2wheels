@@ -52,15 +52,20 @@ There's no build step and nothing to install. The display fonts load from Google
 
 The three classic e-bike video stunts. Hold the key to do one, let go to stop. The left-hand keys (`Z X C`) are for riding on the arrows, the right-hand ones (`J K L`) for riding on `WASD`, so your balance keys stay where they are.
 
-- **Arm swing (×1.5):** the near hand comes off the bar and windmills. That's the hand on the rear brake lever, so there's no brake while you swing, and the swinging arm rocks the bike.
-- **Hand drag (×3 while the glove's on the ground):**
-  - Slide back onto the rear fender, lean back and drop a shoulder over the side.
-  - Your weight goes so far back that the bike carries on past its balance point, until your glove meets the ground and holds it there (about 55° on the Sur-Ron, 60° on the Varg), throwing sparks.
-  - The sliding glove costs speed, so keep a little gas on. Too much and you drive the bike onto your arm until it buckles.
-  - Let go and the hand pushes you back up while your weight comes forward; lean forward to get the front back under control.
-- **Seat surf (×2):** climb up and stand on the seat with your arms out.
-  - The throttle stays where it was when you stood up, and there's no brake. You steer only with your weight (← →), which works harder standing up.
-  - Works on two wheels or in a wheelie. Any hard bump or landing throws you off.
+Each one is modelled on how riders actually do it in e-bike videos:
+- **Arm swing (×1.5):** the near hand comes off the bar, and the straight arm swings forward and back from the shoulder like a pendulum.
+  - That's the hand on the rear brake lever, so there's no brake while you swing.
+  - The swinging arm rocks the bike in time with it.
+- **Hand drag (×3 while the glove is on the ground):**
+  - **The pose:** the rider sits on the back of the seat and hangs off the near side, leaning back. The far hand holds the grip on a straight arm, the knees grip the seat and the feet stay on the pegs. The shoulders twist so the near one drops, and that arm hangs straight down.
+  - **How the balance works:** that position moves the bike's balance point close to vertical, about 59° on the Sur-Ron and 69° on the Varg. There, the glove skims the ground (the multiplier counts while it's within a few centimetres). You hold the bike there with the throttle, as in any near-vertical wheelie. The hand mostly drags; it doesn't hold you up.
+  - **Leaning on the hand:** go a few degrees further and the hand props the bike up, throwing sparks and costing speed. Drive the bike onto it with the gas and the arm buckles; the HUD shows the strain.
+  - **Getting out:** let go and the hand pushes you back up while your weight comes forward. Lean forward to bring the front down.
+  - Hand drags are slow-speed tricks: get the bike up high on the gas first.
+- **Seat surf (×2):** climb up and stand on the back of the seat, bent forward with both hands still on the bars, the way surfing is done on these bikes.
+  - Throttle and brake work as normal.
+  - Your weight is higher and further back, so the bike balances about 6° lower, and leaning (← →) moves it more.
+  - Any hard bump or landing throws you off.
 
 The multipliers stack with the wheelie ones, so a hand drag in a wheelie is worth ×6. The results show how far you went doing each trick.
 

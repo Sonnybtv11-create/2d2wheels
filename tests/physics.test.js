@@ -326,6 +326,25 @@ test('the airfield is flat and empty, and runs on forever', () => {
   }
 });
 
+// Ride slowly up into a high wheelie (50°) for 5 s, then run `policy`.
+function trickRunSlow(b, policy, maxT = 12) {
+  const h = Sim.deriveHandling(b);
+  h.dragHip = require('../js/bikeart.js').info(b.id).dragHip;
+  const t = Sim.createTerrain(1, { airfield: true });
+  const s = Sim.createState();
+  let k = 0;
+  while (s.status === 'riding' && s.time < maxT) {
+    let inp;
+    if (s.time < 5) {
+      if (s.frontDown) { k = (k + 1) % 120; inp = { throttle: s.v < 6, lean: k < 60 ? -1 : 1 }; }
+      else { const e = (s.time < 3.5 ? 25 : 50) * D - s.theta - 0.3 * s.omega; inp = { throttle: e > 0, brake: e < -6 * D, lean: 1 }; }
+    } else inp = policy(s, h);
+    Sim.substep(s, inp, h, t, Sim.FIXED_DT);
+    s.events.length = 0;
+  }
+  return s;
+}
+
 // Ride a steady wheelie to `t0`, then run `policy` for the rest.
 function trickRun(b, policy, maxT = 12) {
   const h = Sim.deriveHandling(b);
@@ -350,39 +369,45 @@ test('arm swing: the near hand is off the bar, so no rear brake', () => {
   assert.ok(s.brake < 0.05, `brake ${s.brake}`);
 });
 
-test('hand drag: past the balance point the hand holds the bike, and letting go recovers', () => {
+test('hand drag: balanced near vertical with the glove skimming the ground, and letting go recovers', () => {
   for (const b of BIKES) {
-    let caught = false;
-    const s = trickRun(b, (st) => {
-      // feather the gas with the hand down: about 40% of the time
-      if (st.time < 9) { caught = caught || st.handDown; return { trick: 'drag', throttle: st.handDown ? st.time % 0.25 < 0.1 : st.omega < 1.2 }; }
-      const e = 15 * D - st.theta - 0.3 * st.omega;
+    let skim = 0, n = 0;
+    const s = trickRunSlow(b, (st, h) => {
+      if (st.time < 11) {
+        // ride it like a 12 o'clock: throttle to hold the balance point
+        const e = Sim.balanceAngle(st, h) - st.theta - 0.5 * st.omega;
+        if (st.time > 8) { n++; if (st.handSkim) skim++; }
+        return { trick: 'drag', throttle: e > 0 };
+      }
+      const e = 20 * D - st.theta - 0.3 * st.omega;
       return { throttle: e > 0, brake: e < -6 * D, lean: -1 };
-    }, 14);
-    assert.ok(caught, `${b.id}: hand never reached the ground`);
+    }, 16);
     assert.equal(s.status, 'riding', `${b.id}: ${s.cause}`);
+    assert.ok(skim / n > 0.8, `${b.id}: glove on the ground ${(100 * skim / n).toFixed(0)}% of the time`);
     assert.ok(s.theta < 30 * D, `${b.id}: back to a normal wheelie (${(s.theta / D).toFixed(0)}°)`);
   }
 });
 
 test('hand drag: pinning the gas onto the arm buckles it', () => {
   for (const b of BIKES) {
-    const s = trickRun(b, () => ({ trick: 'drag', throttle: true }), 12);
+    const s = trickRunSlow(b, () => ({ trick: 'drag', throttle: true }), 14);
     assert.equal(s.cause, 'Arm buckled', b.id);
   }
 });
 
-test('seat surf: throttle locked, steering by weight, and a hard hit throws you off', () => {
+test('seat surf: hands still on the bars, the bike balances lower, and a hard hit throws you off', () => {
   const b = byId('surron-lbx');
-  let thr = null, steady = true;
-  const s = trickRun(b, (st) => {
-    if (st.trickK >= 1) { if (thr === null) thr = st.throttle; else if (Math.abs(st.throttle - thr) > 1e-9) steady = false; }
-    return { trick: 'surf', throttle: !!(st.time % 1 < 0.5), brake: true, lean: st.theta > 3 * D ? -1 : 0 };
-  }, 9);
-  assert.equal(s.status, 'riding', s.cause);
-  assert.ok(steady && thr !== null, 'throttle stayed put while surfing');
-  // a log under the wheels while standing on the seat
   const h = Sim.deriveHandling(b);
+  let balUp = null, balSurf = null;
+  const s = trickRun(b, (st) => {
+    if (st.trickK >= 1) { balSurf = Sim.balanceAngle(st, h); balUp = Sim.balanceAngle({ lean: st.lean, trick: null }, h); }
+    const e = 18 * D - st.theta - 0.3 * st.omega;
+    return { trick: 'surf', throttle: e > 0, brake: e < -6 * D, lean: 0 };
+  }, 12);
+  assert.equal(s.status, 'riding', s.cause);
+  assert.ok(s.inWheelie && Math.abs(s.theta - 18 * D) < 6 * D, 'held a surfing wheelie with throttle and brake');
+  assert.ok(balSurf < balUp - 4 * D, `balance ${(balUp / D).toFixed(0)}° -> ${(balSurf / D).toFixed(0)}° standing up`);
+  // a log under the wheels while standing on the seat
   const t = Sim.createTerrain(1, { airfield: true });
   t.obstacles.push({ type: 'log', x: 80, w: 0.27, h: 0.27, tall: false, soft: false });
   const s2 = Sim.createState({ x: 40 });

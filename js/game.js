@@ -1266,7 +1266,8 @@
     const nose = sim.x + handling.wheelbase;
     const next = terrain.obstaclesNear(nose + 3, nose + 3 + Math.max(10, sim.v * 1.2)).find((o) => !o.soft && !gone.has(o));
     if (sim.handDown && sim.handLoad > Sim.TUNE.dragLoad * 0.75) hint('Easy on the gas · your arm is buckling', 0.3, true);
-    else if (sim.inWheelie && sim.theta > bal + 2 * DEG && sim.trick !== 'drag') hint(sim.trick === 'swing' || sim.trick === 'surf' ? 'Past the balance point · let go of the trick' : 'Past the balance point · brake', 0.3, true);
+    else if (sim.inWheelie && sim.theta > bal + 2 * DEG && sim.trick !== 'drag') hint(sim.trick === 'swing' ? 'Past the balance point · no brake while you swing' : 'Past the balance point · brake', 0.3, true);
+    else if (sim.trick === 'drag' && sim.trickK > 0.9 && !sim.handSkim && sim.theta < bal - 8 * DEG) once('dragup', 'Hand drag: get the bike up near vertical on the gas', 2);
     else if (p && p.active && p.gap < 12) hint('They\'re on you · hold → to tuck and pull away', 0.3, true);
     else if (next && next.overhead && runsThisSession <= 3) once('low' + next.x, `${next.type === 'gate' ? 'Barrier' : 'Low pipe'} · front down and hold → to tuck under it`, 1.6, true);
     else if (next && next.tall && sim.frontDown && runsThisSession <= 3) once('tyres' + next.x, 'Tyre stack · pop the front over it', 1.2, true);
@@ -1809,7 +1810,7 @@
   Object.defineProperty(window, 'wheelieState', {
     get: () => sim && {
       mode, status: sim.status, cause: sim.cause, theta: sim.theta, omega: sim.omega, v: sim.v, lean: sim.lean,
-      dist: sim.wheelieDist, time: sim.time, trick: sim.trick, trickK: sim.trickK, handDown: sim.handDown, handLoad: sim.handLoad, inWheelie: sim.inWheelie, frontDown: sim.frontDown, airborne: sim.airborne,
+      dist: sim.wheelieDist, time: sim.time, trick: sim.trick, trickK: sim.trickK, handDown: sim.handDown, handSkim: sim.handSkim, handLoad: sim.handLoad, inWheelie: sim.inWheelie, frontDown: sim.frontDown, airborne: sim.airborne,
       cr: sim.cr, cf: sim.cf, popT: sim.popT, tuck: sim.tuck, throttle: sim.throttle, x: sim.x, distance: sim.distance, inPuddle: sim.inPuddle, inMud: sim.inMud,
       score: run ? run.score : 0, clears: stats ? stats.clears : 0,
       police: sim.police && { gap: sim.police.gap, active: sim.police.active, v: sim.police.v, level: sim.police.level },

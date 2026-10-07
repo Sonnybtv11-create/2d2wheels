@@ -65,14 +65,26 @@
     trickIn: { swing: 5, drag: 3, surf: 1.6 },
     trickOut: { swing: 6, drag: 1.8, surf: 2 },
     swingRock: 1.2,     // the swinging arm rocks the bike (rad/s²)
-    dragLean: 2.2,      // hanging off the back for a hand drag: far more lean than a normal lean back
-    // Where the dragging hand's shoulder sits: the hips on the seat, the
-    // torso 45° back, the near shoulder dropped over the side.
-    dragHip: [0.05, 0.6], dragDrop: 0.35, dragReach: 0.66,
-    dragFriction: 2.2,  // the glove sliding on the ground (m/s²)
+    // Hand drag. The rider sits on the back of the seat and hangs off the
+    // near side, torso laid back almost flat, holding the far grip on a
+    // straight arm; the near arm hangs straight down. That puts the bike's
+    // balance point close to vertical, just short of where the near hand
+    // reaches the ground: the hand mostly drags, and props the bike up if
+    // it goes a little further. Lean on it hard and the arm gives way.
+    dragHip: [0.05, 0.6],  // hips on the back of the seat (rel. rear axle)
+    dragTorso: 55 * DEG,   // torso back from upright, in the world
+    dragDrop: 0.22,        // near shoulder dropped below the torso line by the twist
+    dragReach: 0.66,       // shoulder to fingertips
+    dragSkim: 0.06,        // within this of the ground (m), the glove counts as dragging
+    dragBalanceGap: 0.03,  // the bike balances with the glove this far off the ground (m)
+    dragFriction: 1.0,     // the glove sliding (m/s²), more as you lean on it
     dragBuckle: 1.7,    // pitch rate (rad/s) the arm can catch
-    dragLoad: 2.6,      // how hard the throttle can drive the bike onto the arm (rad/s²): feather it
-    surfLean: 0.6,      // standing on the seat, a weight shift moves the balance more
+    dragLoad: 2.2,      // how hard the throttle can drive the bike onto the arm (rad/s²): feather it
+    // Seat surf: standing on the back of the seat, both hands still on the
+    // bars. The rider's weight is higher and further back, so the bike
+    // balances lower, and a weight shift moves it more.
+    surfLean: 0.6,
+    surfBalance: 6 * DEG,
     airThrottle: 2.2, airBrake: 3.5, // rotation in the air from wheel spin-up / braking (rad/s²)
     // The pop: snapping into a lean-back with the front down and the throttle
     // on kicks the nose up (body weight plus the fork's rebound). Dipping
@@ -353,7 +365,7 @@
       spin: 0, // rear wheelspin 0..1
       leanIn: 0, popT: 0, // last lean input, time since the last pop
       tuck: 0,                     // 0..1, how far down into the tuck the rider is
-      trick: null, trickK: 0, trickPhase: 0, surfThrottle: 0, handDown: false, handX: 0, handLoad: 0,
+      trick: null, trickK: 0, trickPhase: 0, handDown: false, handX: 0, handLoad: 0, handGap: 1, handSkim: false,
       mode: '', launchArmed: false, launchT: 0, rev: 0, clutchHeld: false, assist: 0,
       status: 'riding',            // riding | crashed | busted
       cause: '',                   // why the run ended
@@ -377,7 +389,38 @@
   }
 
   function balanceAngle(s, h) {
-    return 90 * DEG - COM_ANGLE - s.lean * h.leanAngle;
+    return 90 * DEG - COM_ANGLE - s.lean * h.leanAngle - surfShift(s);
+  }
+
+  function surfShift(s) { return s.trick === 'surf' ? TUNE.surfBalance * s.trickK : 0; }
+
+  // Height of the near shoulder above the hips in the hand-drag pose, and how
+  // far behind them it is (world, m).
+  const dragShoulder = () => [-0.5 * Math.sin(TUNE.dragTorso), 0.5 * Math.cos(TUNE.dragTorso) - TUNE.dragDrop];
+
+  // The pitch at which the hand-drag hand comes within `clear` (m) of flat
+  // ground (0: touching).
+  function dragContact(h, clear = 0) {
+    const [hx, hy] = h.dragHip || TUNE.dragHip;
+    const rise = dragShoulder()[1], R = h.wheelRadius;
+    // in a wheelie the rear shock carries everything, so it sits lower than at rest
+    const squat = G / (h.rearK || TUNE.rearK) - (h.rearSag || 0);
+    const gap = (th) => R - squat + hx * Math.sin(th) + hy * Math.cos(th) + rise - TUNE.dragReach - clear;
+    let lo = 10 * DEG, hi = CRASH_ANGLE;
+    if (gap(hi) > 0) return hi;
+    for (let i = 0; i < 30; i++) { const mid = (lo + hi) / 2; if (gap(mid) > 0) lo = mid; else hi = mid; }
+    return hi;
+  }
+
+  // The lean (weight shift) that balances the bike with the glove just off
+  // the ground. Cached per handling and hip position.
+  function dragLean(h) {
+    const key = (h.dragHip || TUNE.dragHip).join();
+    if (h._dragKey !== key) {
+      h._dragKey = key;
+      h._dragLean = (90 * DEG - dragContact(h, TUNE.dragBalanceGap) - COM_ANGLE) / h.leanAngle;
+    }
+    return h._dragLean;
   }
 
   /* ------------------------------------------------------------------ */
@@ -405,7 +448,6 @@
       if (s.trickK <= 0) s.trick = null;
     } else if (trickWant && !s.trick && (trickWant !== 'surf' || (!s.airborne && s.v > 2))) {
       s.trick = trickWant; s.trickK = 0;
-      if (trickWant === 'surf') s.surfThrottle = s.throttle;
     }
     if (s.trick && s.trick === trickWant) s.trickK = Math.min(1, s.trickK + TUNE.trickIn[s.trick] * dt);
     s.trickPhase += dt * 7.5;
@@ -427,13 +469,11 @@
     }
     if (s.launchT > 0) s.launchT -= dt;
     const launching = s.launchT > 0 && input.throttle;
-    // Seat surfing, the throttle stays where it was when you stood up.
-    if (surfing) s.throttle = s.surfThrottle;
-    else s.throttle += clamp((input.throttle ? 1 : 0) - s.throttle, -TUNE.throttleDown * dt, (launching ? 40 : TUNE.throttleUp * mode.ramp) * dt);
-    s.brake += clamp((input.brake && !s.launchArmed && !handOff && !surfing ? 1 : 0) - s.brake, -TUNE.brakeDown * dt, TUNE.brakeUp * dt);
+    s.throttle += clamp((input.throttle ? 1 : 0) - s.throttle, -TUNE.throttleDown * dt, (launching ? 40 : TUNE.throttleUp * mode.ramp) * dt);
+    s.brake += clamp((input.brake && !s.launchArmed && !handOff ? 1 : 0) - s.brake, -TUNE.brakeDown * dt, TUNE.brakeUp * dt);
     if (s.launchArmed) { s.brake = 0; s.v = 0; }
     let leanWant = input.lean || 0;
-    if (s.trick === 'drag') leanWant += (TUNE.dragLean - leanWant) * s.trickK;
+    if (s.trick === 'drag') leanWant += (dragLean(h) - leanWant) * s.trickK;
     else if (surfing) leanWant *= 1 + TUNE.surfLean * s.trickK;
     s.lean += clamp(leanWant - s.lean, -TUNE.leanRate * dt, TUNE.leanRate * dt);
     s.braking = s.brake > 0.3;
@@ -583,7 +623,7 @@
 
     /* --- pitch about the rear axle --- */
     // lying over the tank in a tuck puts more weight forward than a lean
-    const phi = COM_ANGLE + s.lean * h.leanAngle - s.tuck * 8 * DEG;
+    const phi = COM_ANGLE + s.lean * h.leanAngle - s.tuck * 8 * DEG + surfShift(s);
     const beta = s.theta + phi;
     let alpha;
     if (s.airborne) {
@@ -621,15 +661,18 @@
     // their weight is forward again)
     const wasDown = s.handDown, leaving = trickWant !== 'drag';
     s.handDown = false;
+    s.handGap = 1;
     if (!wasDown) s.handLoad = 0;
     if (s.trick === 'drag' && (s.trickK > 0.85 || (leaving && wasDown && s.trickK > 0.1)) && !s.airborne) {
       const p3 = s.theta + slope, c = Math.cos(p3), sn = Math.sin(p3);
       const [hx, hy] = h.dragHip || TUNE.dragHip;
       const hipX = s.x + hx * c - hy * sn;
       const hipY = terrain.base(s.x) + s.yq + R + hx * sn + hy * c;
-      // torso 45° back in the world, near shoulder dropped over the side
-      const shX = hipX - 0.354, shY = hipY + 0.354 - TUNE.dragDrop;
+      const [sx, sy] = dragShoulder();
+      const shX = hipX + sx, shY = hipY + sy;
       const gap = shY - TUNE.dragReach - terrain.base(shX);
+      s.handGap = gap;
+      s.handX = shX;
       if (gap < 0) {
         if (s.omega > TUNE.dragBuckle) {
           s.events.push({ type: 'impact', obstacle: { type: 'hand', x: shX, w: 0.2, h: 0 }, strength: 2, end: 'rider', v: s.v });
@@ -649,7 +692,7 @@
         }
         s.handDown = true;
         s.handX = shX;
-        s.v = Math.max(0, s.v - TUNE.dragFriction * dt);
+        s.v = Math.max(0, s.v - (TUNE.dragFriction + 0.6 * s.handLoad) * dt);
       }
     }
 
@@ -738,6 +781,9 @@
         if ((e.type === 'impact' && e.strength > 0.5) || e.type === 'bottom') { crash(s, 'Fell off the seat'); return; }
       }
     }
+
+    // the glove touching or skimming the ground
+    s.handSkim = s.trick === 'drag' && s.trickK > 0.85 && s.handGap < TUNE.dragSkim;
 
     if (s.theta >= CRASH_ANGLE) { crash(s, 'Looped out'); return; }
     if (s.theta < -25 * DEG) { crash(s, 'Went over the bars'); return; }
@@ -849,6 +895,7 @@
   }
 
   const api = {
+    dragContact, dragLean,
     G, DEG, CRASH_ANGLE, COM_ANGLE, FIXED_DT, FORK_RAKE, TUNE, COP, WANTED, STINGER, OBSTACLES,
     deriveHandling, driveAt, pitchGainAt, wheelOffsets, chassisY,
     createTerrain, createWeather, createState, step, substep, balanceAngle, mulberry32, obstacleProfile,

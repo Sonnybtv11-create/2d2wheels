@@ -866,22 +866,32 @@
 
   const EDGE = 'rgba(10,11,13,0.45)';
 
-  // Where the hips go for a hand drag (bike frame, from the rear contact).
+  // Where the hips go for a hand drag (bike frame, from the rear contact):
+  // the back of the seat.
   function dragHip(art) { return [0.05, art.rider.hip[1] + 0.02]; }
+  // Hand-drag torso: laid back 55° from upright in the world, the near
+  // shoulder dropped 0.22 m below the torso line by the twist. Kept in step
+  // with TUNE.dragTorso / dragDrop in physics.js.
+  const DRAG_TORSO = 55 * Math.PI / 180, DRAG_DROP = 0.22;
 
-  // Trick poses, blended in by tr.k (0..1). `pitch` is the bike's angle in
-  // the world, so a pose can hold the rider upright (or lying back) in the
-  // world rather than with the bike. `groundAt(x, y)` gives a bike-frame
-  // point's height above the ground.
-  //   swing: the near hand off the bar, windmilling
-  //   drag:  hips back, torso laid back, near shoulder dropped over the side
-  //          and the near hand reaching down to the ground
-  //   surf:  standing on the seat, arms out
+  // Trick poses, blended in by tr.k (0..1). Taken from riding footage:
+  //   swing: the near hand off the bar, the straight arm swinging forward
+  //          and back from the shoulder like a pendulum
+  //   drag:  sitting on the back of the seat, hanging off the near side
+  //          with the torso laid well back, far hand on the grip
+  //          (straight arm), feet on the pegs, near arm straight down with
+  //          the glove skimming the ground
+  //   surf:  feet on the back of the seat, standing up straight in the
+  //          world, both hands still on the bars
+  // `pitch` is the bike's angle in the world, so poses can hold the body
+  // upright (or laid back) in the world rather than with the bike.
+  // `groundAt(x, y)` gives a bike-frame point's height above the ground.
   function trickPose(art, p, tr, pitch, groundAt) {
     const k = tr.k * tr.k * (3 - 2 * tr.k);
     const L = (a, b, t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t];
     const add = (a, d, m) => [a[0] + d[0] * m, a[1] + d[1] * m];
     const norm = (v) => { const l = Math.hypot(v[0], v[1]) || 1; return [v[0] / l, v[1] / l]; };
+    const dist = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1]);
     const up = [Math.sin(pitch), Math.cos(pitch)], down = [-up[0], -up[1]], fw = [Math.cos(pitch), -Math.sin(pitch)];
     // an elbow with a small visible bend, below the shoulder-hand line
     const bend = (sh, hand) => {
@@ -889,50 +899,80 @@
       const mid = L(sh, hand, 0.5), off = [e[0] - mid[0], e[1] - mid[1]], ol = Math.hypot(off[0], off[1]);
       return ol > 0.07 ? add(mid, off, 0.07 / ol) : e;
     };
+    // a hand that can't reach its target stops at arm's length
+    const reachTo = (sh, target) => {
+      const d = dist(sh, target), max = BODY.upper + BODY.fore - 0.02;
+      return d <= max ? target : add(sh, norm([target[0] - sh[0], target[1] - sh[1]]), max);
+    };
+    const torsoFrom = (hip, tdir) => {
+      const fwd = [tdir[1], -tdir[0]];
+      const shoulder = add(hip, tdir, BODY.torso);
+      return { tdir, fwd, shoulder, head: add(add(shoulder, tdir, 0.25), fwd, 0.04), headRot: Math.atan2(-tdir[0], tdir[1]) };
+    };
     const q = Object.assign({}, p, { farHand: p.hand, farElbow: p.elbow });
     const r = art.rider;
     if (tr.type === 'swing') {
-      const a = tr.phase;
-      q.hand = L(p.hand, add(p.shoulder, [Math.cos(a), Math.sin(a)], 0.58), k);
+      // pendulum: from behind the hip to out in front, through hanging down
+      const a = (20 + 70 * Math.sin(tr.phase)) * Math.PI / 180;
+      const dir = [down[0] * Math.cos(a) + fw[0] * Math.sin(a), down[1] * Math.cos(a) + fw[1] * Math.sin(a)];
+      q.hand = L(p.hand, add(p.shoulder, dir, BODY.upper + BODY.fore - 0.04), k);
       q.elbow = bend(q.shoulder, q.hand);
     } else if (tr.type === 'drag') {
-      // slid right back onto the rear fender, over the axle
-      q.hip = L(p.hip, dragHip(art), k);
-      // 45° back from upright in the world
-      q.tdir = norm(L(p.tdir, norm([up[0] - fw[0], up[1] - fw[1]]), k));
-      q.fwd = [q.tdir[1], -q.tdir[0]];
-      q.shoulder = add(q.hip, q.tdir, BODY.torso);
-      q.head = add(add(q.shoulder, q.tdir, 0.25), q.fwd, 0.04);
-      q.knee = ik(q.hip, p.foot, BODY.thigh, BODY.shin, 1);
-      q.farElbow = bend(q.shoulder, p.hand);
-      q.nearShoulder = add(q.shoulder, down, 0.35 * k);
+      const hip = L(p.hip, dragHip(art), k);
+      // lie back as far as the far arm, straight, can still hold the grip
+      let tdirD = null;
+      for (let deg = DRAG_TORSO * 180 / Math.PI; deg >= 0; deg -= 2) {
+        const b = deg * Math.PI / 180;
+        const td = [up[0] * Math.cos(b) - fw[0] * Math.sin(b), up[1] * Math.cos(b) - fw[1] * Math.sin(b)];
+        tdirD = td;
+        if (dist(add(hip, td, BODY.torso), p.hand) <= BODY.upper + BODY.fore - 0.03) break;
+      }
+      const T = torsoFrom(hip, norm(L(p.tdir, tdirD, k)));
+      Object.assign(q, T, { hip });
+      // looking down at the ground beside the bike
+      q.headRot = (1 - k) * (-pitch * 0.55 - 0.12) + k * (T.headRot + 0.5);
+      q.knee = ik(hip, p.foot, BODY.thigh, BODY.shin, 1);
+      // far hand stays on the grip
+      q.farHand = reachTo(q.shoulder, p.hand);
+      q.farElbow = bend(q.shoulder, q.farHand);
+      // near arm: the shoulders twist so the near one drops (as far as the
+      // hand needs to reach the ground), then straight down
+      const arm = BODY.upper + BODY.fore;
+      const hgt0 = groundAt ? groundAt(q.shoulder[0], q.shoulder[1]) : 1;
+      const drop = Math.max(DRAG_DROP, Math.min(0.42, hgt0 - arm - 0.03)) * k;
+      q.nearShoulder = add(q.shoulder, down, drop);
       const hgt = groundAt ? groundAt(q.nearShoulder[0], q.nearShoulder[1]) : 0.7;
-      const reach = tr.handDown ? Math.max(0.2, hgt - 0.04) : Math.min(0.62, Math.max(0.2, hgt - 0.04));
-      // reaching down and a little back, the palm skimming the ground
-      const dir = norm([down[0] - fw[0] * 0.25, down[1] - fw[1] * 0.25]);
-      q.hand = L(p.hand, add(q.nearShoulder, dir, reach), k);
+      const dir = norm([down[0] - fw[0] * 0.12, down[1] - fw[1] * 0.12]);
+      const len = Math.max(0.3, Math.min(arm, (hgt - 0.04) / Math.abs(dir[0] * up[0] * -1 + dir[1] * up[1] * -1 || 1)));
+      q.hand = L(p.hand, add(q.nearShoulder, dir, len), k);
       q.elbow = bend(q.nearShoulder, q.hand);
     } else if (tr.type === 'surf') {
-      // feet up on the seat (lifted in an arc as you climb), standing
-      // upright in the world, arms out for balance
-      const seat = [r.hip[0] + 0.02, r.hip[1] - 0.03];
-      const foot = add(L(p.foot, seat, k), up, 0.12 * Math.sin(Math.PI * k));
-      const lean = tr.lean || 0; // a weight shift tilts the standing rider
-      const body = norm([up[0] - fw[0] * 0.25 * lean, up[1] - fw[1] * 0.25 * lean]);
-      const hipS = add(add(seat, body, 0.74), fw, 0.06); // knees soft, like a surfer
-      q.foot = foot;
-      q.hip = L(p.hip, hipS, k);
-      q.knee = ik(q.hip, q.foot, BODY.thigh, BODY.shin, 1);
-      q.tdir = norm(L(p.tdir, body, k));
-      q.fwd = [q.tdir[1], -q.tdir[0]];
-      q.shoulder = add(q.hip, q.tdir, BODY.torso);
-      q.head = add(add(q.shoulder, q.tdir, 0.25), q.fwd, 0.04);
-      const wave = Math.sin(tr.phase * 0.6) * 0.12;
-      q.hand = L(p.hand, add(add(q.shoulder, fw, 0.5), up, 0.18 + wave), k);
+      // feet on the back of the seat (lifted in an arc as you climb up)
+      const seat = [r.hip[0] - 0.12, r.hip[1] - 0.04];
+      const foot = add(L(p.foot, seat, k), up, 0.15 * Math.sin(Math.PI * k));
+      // standing up in the world, knees soft, weight shifting with the lean
+      const lean = Math.max(-1, Math.min(1.6, tr.lean || 0));
+      const legDir = norm([up[0] - fw[0] * 0.12 * lean, up[1] - fw[1] * 0.12 * lean]);
+      const hipS = add(add(seat, legDir, 0.84), fw, 0.05);
+      const hip = L(p.hip, hipS, k);
+      // lean the torso forward just enough for straight-ish arms to reach the bars
+      let best = null;
+      for (let deg = 0; deg <= 80; deg += 4) {
+        const b = deg * Math.PI / 180;
+        const td = norm([up[0] * Math.cos(b) + fw[0] * Math.sin(b), up[1] * Math.cos(b) + fw[1] * Math.sin(b)]);
+        const d = dist(add(hip, td, BODY.torso), p.hand);
+        if (!best || Math.abs(d - 0.52) < best.err) best = { td, err: Math.abs(d - 0.52) };
+        if (d <= 0.52) break;
+      }
+      const T = torsoFrom(hip, norm(L(p.tdir, best.td, k)));
+      Object.assign(q, T, { hip, foot });
+      q.headRot = (1 - k) * (-pitch * 0.55 - 0.12) + k * (T.headRot * 0.5 - 0.1);
+      q.knee = ik(hip, foot, BODY.thigh, BODY.shin, 1);
+      q.hand = reachTo(q.shoulder, p.hand);
       q.elbow = bend(q.shoulder, q.hand);
-      q.farHand = L(p.hand, add(add(q.shoulder, fw, -0.45), up, 0.24 - wave), k);
-      q.farElbow = bend(q.shoulder, q.farHand);
-      q.farFoot = add(foot, fw, -0.12);
+      q.farHand = q.hand;
+      q.farElbow = q.elbow;
+      q.farFoot = add(foot, fw, -0.06);
     }
     return q;
   }
@@ -1025,8 +1065,8 @@
   function drawHelmet(ctx, p, kit, pitch) {
     ctx.save();
     ctx.translate(p.head[0], p.head[1]);
-    // keep the head roughly level as the bike pitches up
-    ctx.rotate(-pitch * 0.55 - 0.12);
+    // keep the head roughly level as the bike pitches up (or follow a trick pose)
+    ctx.rotate(p.headRot !== undefined ? p.headRot : -pitch * 0.55 - 0.12);
     ctx.lineWidth = 0.007;
     ctx.strokeStyle = EDGE;
     // shell
@@ -1121,6 +1161,13 @@
     if (rider) {
       drawTorso(ctx, p, art.kit);
       drawLeg(ctx, p, art.kit, false);
+      if (p.nearShoulder) {
+        // the torso twisted towards us: the near side of the chest runs down
+        // from the shoulders to the dropped near shoulder
+        const back = [p.shoulder[0] - p.fwd[0] * 0.06, p.shoulder[1] - p.fwd[1] * 0.06];
+        limb(ctx, back, p.nearShoulder, 0.24, 0.17, art.kit.jersey);
+        limb(ctx, at(back, p.nearShoulder, 0.2), at(back, p.nearShoulder, 0.85), 0.05, 0.04, art.kit.jersey2, false);
+      }
       drawArm(ctx, p.nearShoulder ? Object.assign({}, p, { shoulder: p.nearShoulder }) : p, art.kit, false);
       drawHelmet(ctx, p, art.kit, opts.pitch || 0);
     }
